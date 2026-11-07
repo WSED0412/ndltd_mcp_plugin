@@ -102,3 +102,17 @@ async def test_extension_not_connected_times_out_clearly(bridge, monkeypatch):
     with pytest.raises(NdltdNetworkError, match="擴充功能沒有連上"):
         await c.search_html("x")
     assert bridge.jobs.empty()  # the abandoned job was withdrawn
+
+
+def test_job_is_requeued_when_poller_hangs_up(bridge):
+    import socket
+    import time
+
+    bridge.jobs.put({"id": "j1", "method": "GET", "path": "/x", "body": None})
+    s = socket.create_connection(("127.0.0.1", bridge.port))
+    crlf = chr(13) + chr(10)
+    s.sendall(crlf.join(["GET /poll HTTP/1.1", "Host: 127.0.0.1", "X-Ndltd-Token: " + TOKEN, "", ""]).encode())
+    s.close()  # hang up right away
+    time.sleep(0.5)
+    st, data = http_call(bridge, "GET", "/poll")
+    assert st == 200 and json.loads(data)["id"] == "j1"

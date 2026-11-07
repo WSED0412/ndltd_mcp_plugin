@@ -90,9 +90,15 @@ class _Handler(BaseHTTPRequestHandler):
             job = b.jobs.get(timeout=POLL_SECONDS)
         except queue.Empty:
             b.last_poll = time.monotonic()
-            return self._reply(204)
+            try:
+                return self._reply(204)
+            except OSError:  # poller already gone; nothing to hand over
+                return None
         b.last_poll = time.monotonic()
-        self._reply(200, job)
+        try:
+            self._reply(200, job)
+        except OSError:  # the poller hung up (e.g. its service worker was recycled): do not lose the job
+            b.jobs.put(job)
 
     def do_POST(self):
         b: Bridge = self.server.owner  # type: ignore[attr-defined]
