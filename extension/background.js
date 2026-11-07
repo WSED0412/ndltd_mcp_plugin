@@ -3,6 +3,7 @@
 const HOME = "https://ndltd.ncl.edu.tw/";
 const POLL_GAP_MS = 1500;
 let running = false;
+let keepAlive = null;
 
 async function settings() {
   const s = await chrome.storage.local.get({ token: "", port: 8765 });
@@ -104,6 +105,9 @@ async function runJob(job) {
 async function loop() {
   if (running) return;
   running = true;
+  // MV3 recycles an idle service worker after ~30 s, and only the 30 s alarm wakes it again (measured: a job
+  // after a quiet spell waited ~55 s). Any extension API call resets the idle timer, so touch one regularly.
+  keepAlive = setInterval(() => { chrome.runtime.getPlatformInfo().catch(() => {}); }, 20000);
   try {
     for (;;) {
       const { token, port } = await settings();
@@ -127,6 +131,7 @@ async function loop() {
     }
   } finally {
     running = false;
+    clearInterval(keepAlive);
   }
 }
 

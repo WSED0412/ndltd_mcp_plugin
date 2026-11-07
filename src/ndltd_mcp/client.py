@@ -21,7 +21,8 @@ from .errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdNetworkError
 BASE = "https://ndltd.ncl.edu.tw"
 CGI = BASE + "/cgi-bin/gs32/gsweb.cgi"
 HOME = BASE + "/"  # sets the webnum cookie; its script then jumps to ENTRY (observed 2026-11-08)
-ENTRY = CGI + "/login?ssoauth=1&loadingjs=1&o=dwebmge&cache={ts}"
+# no cache=<ms> parameter (the page script adds one): robots.txt disallows URLs containing "cache="
+ENTRY = CGI + "/login?ssoauth=1&loadingjs=1&o=dwebmge"
 TIMEOUT = 30.0
 MIN_INTERVAL = 3.0
 HEADERS = {
@@ -150,7 +151,7 @@ class NdltdClient(SessionApi):
     async def _ensure_session(self) -> str:
         if self.ccd is None:
             await self._checked_home(await self._raw("GET", HOME))
-            await self._checked(await self._raw("GET", ENTRY.format(ts=int(time.time() * 1000))))
+            await self._checked(await self._raw("GET", ENTRY))
         if self.ccd is None:
             raise NdltdNetworkError("進站後沒有取得 session（網址裡找不到 ccd=…）。")
         return self.ccd

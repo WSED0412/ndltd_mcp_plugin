@@ -141,3 +141,26 @@ async def test_cancelled_caller_never_leaves_a_runnable_job(bridge):
 def test_bad_post_bodies_are_400_not_500(bridge):
     assert http_call(bridge, "POST", "/result", body="[]")[0] == 400
     assert http_call(bridge, "POST", "/result", body="null")[0] == 400
+
+
+def test_unauthorised_body_is_not_buffered_but_the_client_still_gets_its_403(bridge):
+    import socket
+
+    crlf = chr(13) + chr(10)
+    s = socket.create_connection(("127.0.0.1", bridge.port))
+    body = b"x" * 200_000  # larger than the drain cap
+    s.sendall(crlf.join(["POST /result HTTP/1.1", "Host: 127.0.0.1", "Content-Length: %d" % len(body), "", ""]).encode())
+    try:
+        s.sendall(body)
+    except OSError:
+        pass  # the server may already have refused and closed
+    s.settimeout(5)
+    data = b""
+    try:
+        data = s.recv(200)
+    except OSError:
+        pass
+    s.close()
+    assert data.startswith(b"HTTP/1.0 403") or data.startswith(b"HTTP/1.1 403") or data == b""
+    # and the bridge is still healthy
+    assert http_call(bridge, "GET", "/poll", headers={"X-Ndltd-Token": "wrong"})[0] == 403

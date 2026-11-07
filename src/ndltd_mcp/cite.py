@@ -47,23 +47,34 @@ def _kind(d: Detail) -> tuple[str, str, str]:
 def apa7(d: Detail) -> str:
     _need(d, "研究生", "論文名稱", "校院名稱", "學位類別")
     author, title = d.fields["研究生"], d.fields["論文名稱"]
-    if not (_CJK.search(author) and _CJK.search(title)):
+    if not _CJK.search(author):
         raise NdltdError(
-            "目前只支援中文姓名與中文篇名的 APA 引用（外文姓名需轉成「姓, 名縮寫」，自動轉換容易出錯）。"
+            "目前只支援中文姓名的 APA 引用（外文姓名需轉成「姓, 名縮寫」，自動轉換容易出錯）。"
             "請改用 format=\"bibtex\" 或 \"ris\"，讓書目軟體排版。"
         )
-    url = _url(d)
-    if not url:
-        raise NdltdError("詳目頁沒有永久網址（hdl.handle.net），無法產生含網址的 APA 引用；請改用 bibtex 或 ris。")
     _, _, label = _kind(d)
-    return f"{author}（{_year(d)}）。*{title}*〔{label}，{d.fields['校院名稱']}〕。{DB_NAME}。{url}"
+    url = _url(d)
+    return f"{author}（{_year(d)}）。*{title}*〔{label}，{d.fields['校院名稱']}〕。{DB_NAME}。" + (url if url else "").rstrip()
+
+
+_BIB = {
+    "\\": r"\textbackslash{}", "{": r"\{", "}": r"\}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
+    "_": r"\_", "^": r"\textasciicircum{}", "~": r"\textasciitilde{}",
+}
 
 
 def _bib_escape(s: str) -> str:
-    return re.sub(r"([&%$#_])", r"\\\1", s.replace("\\", "").replace("{", "(").replace("}", ")"))
+    return "".join(_BIB.get(c, c) for c in s)
 
 
-def bibtex(d: Detail, thesis_id: str | None = None) -> str:
+def _keywords(d: Detail) -> list[str]:
+    out: list[str] = []
+    for lab in ("中文關鍵詞", "外文關鍵詞"):
+        out += [k.strip() for k in re.split(r"[、,;；]", d.fields.get(lab, "")) if k.strip()]
+    return out
+
+
+def bibtex(d: Detail, thesis_id: str | None = None, note: str = "") -> str:
     _need(d, "研究生", "論文名稱", "校院名稱")
     entry, _, label = _kind(d)
     key = "ndltd" + (d.handle.rsplit("/", 1)[-1] if d.handle else (thesis_id or "").lower() or "x")
@@ -75,7 +86,7 @@ def bibtex(d: Detail, thesis_id: str | None = None) -> str:
         ("year", _year(d)),
         ("type", label),
         ("language", f.get("語文別", "")),
-        ("keywords", "、".join(x for x in (f.get("中文關鍵詞", ""), f.get("外文關鍵詞", "")) if x)),
+        ("keywords", ", ".join(_keywords(d))),
         ("url", _url(d)),
         ("note", "；".join(x for x in (
             f"指導教授：{f['指導教授']}" if f.get("指導教授") else "",
@@ -84,12 +95,13 @@ def bibtex(d: Detail, thesis_id: str | None = None) -> str:
         ) if x)),
     ]
     body = ",\n".join(f"  {k} = {{{v if k in ('title', 'url') else _bib_escape(v)}}}" for k, v in rows if v)
-    return f"@{entry}{{{key},\n{body}\n}}"
+    head = f"% {note}\n" if note else ""  # a BibTeX comment: ignored by BibTeX, kept visible to the human
+    return f"{head}@{entry}{{{key},\n{body}\n}}"
 
 
-def ris(d: Detail, thesis_id: str | None = None) -> str:
+def ris(d: Detail, thesis_id: str | None = None, note: str = "") -> str:
     _need(d, "研究生", "論文名稱", "校院名稱")
-    _, note, label = _kind(d)
+    _, _, label = _kind(d)
     f = d.fields
     lines = [
         "TY  - THES",
@@ -102,24 +114,25 @@ def ris(d: Detail, thesis_id: str | None = None) -> str:
     ]
     if f.get("語文別"):
         lines.append(f"LA  - {f['語文別']}")
-    for kw_field in ("中文關鍵詞", "外文關鍵詞"):
-        for kw in re.split(r"[、,;；]", f.get(kw_field, "")):
-            if kw.strip():
-                lines.append(f"KW  - {kw.strip()}")
+    lines += [f"KW  - {k}" for k in _keywords(d)]
     if f.get("指導教授"):
         lines.append(f"N1  - 指導教授：{f['指導教授']}")
     if _url(d):
         lines.append(f"UR  - {_url(d)}")
+    if note:  # the first line must stay "TY  - ", so the provenance note goes into a note field
+        lines.append(f"N1  - {note}")
     lines.append("ER  - ")
     return "\n".join(lines)
 
 
-def make(fmt: str, d: Detail, thesis_id: str | None = None) -> str:
+def make(fmt: str, d: Detail, thesis_id: str | None = None, note: str = "") -> str:
+    """`note` is a short provenance remark (e.g. 'fetched as result #3 of a search, check the title'). It is placed
+    where each format allows it, never in front of the record itself."""
     fmt = (fmt or "apa").strip().lower()
     if fmt == "apa":
-        return apa7(d)
+        return (f"（{note}）\n" if note else "") + apa7(d)
     if fmt == "bibtex":
-        return bibtex(d, thesis_id)
+        return bibtex(d, thesis_id, note)
     if fmt == "ris":
-        return ris(d, thesis_id)
+        return ris(d, thesis_id, note)
     raise NdltdError(f"不認得的格式 {fmt!r}。可用：{', '.join(FORMATS)}。")

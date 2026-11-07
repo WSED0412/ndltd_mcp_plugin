@@ -171,6 +171,11 @@ def parse_detail(html: str) -> Detail:
                   toc=block("目次", required=False), references=block("參考文獻", required=False))
 
 
+def _paren(d: Detail, label: str) -> str:
+    v = d.fields.get(label)
+    return f"（{v}）" if v else ""
+
+
 def format_detail(d: Detail, thesis_id: str | None = None, include_toc: bool = False,
                   include_references: bool = False) -> str:
     def j(label: str) -> str:
@@ -181,8 +186,8 @@ def format_detail(d: Detail, thesis_id: str | None = None, include_toc: bool = F
         f"永久網址：https://hdl.handle.net/{d.handle}" if d.handle else f"永久網址：{NONE}",
         f"論文名稱：{j('論文名稱')}",
         f"論文名稱（外文）：{j('論文名稱(外文)')}",
-        f"研究生：{j('研究生')}（{j('研究生(外文)')}）",
-        f"指導教授：{j('指導教授')}（{j('指導教授(外文)')}）",
+        f"研究生：{j('研究生')}{_paren(d, '研究生(外文)')}",
+        f"指導教授：{j('指導教授')}{_paren(d, '指導教授(外文)')}",
         f"學位類別：{j('學位類別')}",
         f"校院名稱：{j('校院名稱')}",
         f"系所名稱：{j('系所名稱')}",

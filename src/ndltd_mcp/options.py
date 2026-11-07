@@ -4,6 +4,8 @@ Form values were read from the live page (2026-11). Only `exact` and the default
 end-to-end; the other match modes are the form's own values but unverified against live results."""
 from __future__ import annotations
 
+import re
+
 from .errors import NdltdError
 
 FIELD_CODES = {
@@ -15,6 +17,10 @@ FIELD_CODES = {
     "abstract": "ab",    # 摘要
     "references": "rf",  # 參考文獻
 }
+FIELD_ALIASES = {  # the Chinese labels, so a model that copies them from the docs is understood
+    "論文名稱": "ti", "研究生": "au", "指導教授": "ad", "口試委員": "say", "關鍵詞": "kw", "摘要": "ab", "參考文獻": "rf",
+    "不限欄位": "all",
+}
 FIELD_LABELS = {"ti": "論文名稱", "au": "研究生", "ad": "指導教授", "say": "口試委員", "kw": "關鍵詞", "ab": "摘要", "rf": "參考文獻"}
 MATCH_CODES = {"exact": "es0", "fuzzy": "es1", "homophone": "es2", "synonym": "es3"}  # 精準／模糊／同音／同義詞
 
@@ -25,13 +31,13 @@ DEFAULT_MATCH = "exact"
 def resolve_fields(spec: str) -> tuple[str, ...]:
     """'title,keyword' | 'advisor' | 'all' (names or the site's own codes) -> ('ti', 'kw')."""
     spec = (spec or "").strip().lower() or DEFAULT_FIELDS
-    if spec == "all":
-        return tuple(FIELD_CODES.values())
     out: list[str] = []
-    for part in (p.strip() for p in spec.replace("，", ",").replace(" ", ",").split(",")):
+    for part in re.split(r"[,\s，、;；]+", spec):
         if not part:
             continue
-        code = FIELD_CODES.get(part) or (part if part in FIELD_LABELS else None)
+        if part in ("all", "不限欄位"):
+            return tuple(FIELD_CODES.values())
+        code = FIELD_CODES.get(part) or FIELD_ALIASES.get(part) or (part if part in FIELD_LABELS else None)
         if code is None:
             raise NdltdError(f"不認得的搜尋欄位 {part!r}。可用：{', '.join(FIELD_CODES)}，或 all。")
         if code not in out:

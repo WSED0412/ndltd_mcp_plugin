@@ -27,9 +27,10 @@ from .client import MIN_INTERVAL, SessionApi
 from .errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdNetworkError
 
 DEFAULT_PORT = 8765
-POLL_SECONDS = 25.0
+POLL_SECONDS = 20.0  # shorter than the service worker's ~30 s idle limit
 JOB_TIMEOUT = 90.0
-MAX_BODY = 8 * 1024 * 1024
+MAX_BODY = 4 * 1024 * 1024
+UNAUTH_DRAIN = 64 * 1024  # read at most this much of an unauthorised body
 EXT_ALIVE_WITHIN = 70.0  # the extension polls every <= 25 s; longer silence means it is not connected
 
 
@@ -53,6 +54,7 @@ def load_or_create_token() -> str:
 
 class _Handler(BaseHTTPRequestHandler):
     server_version = "ndltd-bridge"
+    timeout = 30  # a stalled client cannot hold a handler thread forever
 
     def log_message(self, *a):
         pass
@@ -110,11 +112,14 @@ class _Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             return self._reply(400, {"error": "bad length"})
+        if not self._authorized():
+            # refuse without buffering the body; drain a little so the client sees the 403 instead of a reset
+            self.rfile.read(max(0, min(n, UNAUTH_DRAIN)))
+            self.close_connection = True
+            return self._reply(403, {"error": "forbidden"})
         if n > MAX_BODY:
             return self._reply(413, {"error": "too large"})
-        raw = self.rfile.read(n)  # always consume the body first, or a refusal can reset the client's connection
-        if not self._authorized():
-            return self._reply(403, {"error": "forbidden"})
+        raw = self.rfile.read(n)
         if urlparse(self.path).path != "/result":
             return self._reply(404, {"error": "not found"})
         try:

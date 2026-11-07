@@ -74,7 +74,7 @@ async def _load_detail(thesis_id: str, query: str, index: int, fields: str, matc
     if query and index >= 1:
         f, m = options.resolve_fields(fields), options.resolve_match(match)
         d = parsers.parse_detail(await get_client().record_html(query, index, fields=f, match=m))
-        return d, None, f"（依搜尋「{query}」第 {index} 筆取得，請核對篇名）\n"
+        return d, None, f"依搜尋「{query}」第 {index} 筆取得，請核對篇名"
     raise NdltdError("請提供 thesis_id，或同時提供 query 與 index（>=1）。")
 
 
@@ -136,7 +136,8 @@ async def ndltd_abstract(thesis_id: str = "", query: str = "", index: int = 0,
         include_references: 附上參考文獻（同一頁，清單可能很長；預設關閉）。
     """
     d, tid, note = await _load_detail(thesis_id, query, index, fields, match)
-    return note + parsers.format_detail(d, tid, include_toc=include_toc, include_references=include_references)
+    return (f"（{note}）\n" if note else "") + parsers.format_detail(
+        d, tid, include_toc=include_toc, include_references=include_references)
 
 
 @_tool
@@ -151,4 +152,4 @@ async def ndltd_cite(thesis_id: str = "", query: str = "", index: int = 0,
     引用只用詳目頁已有的欄位，並以論文出版年（西元）為年份；請與原頁面核對。
     """
     d, tid, note = await _load_detail(thesis_id, query, index, fields, match)
-    return note + cite.make(format, d, tid)
+    return cite.make(format, d, tid, note)
