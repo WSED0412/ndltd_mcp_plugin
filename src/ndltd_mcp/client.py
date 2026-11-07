@@ -45,11 +45,15 @@ class SessionApi:
     Shared by the plain-HTTP client and the browser-bridge client."""
 
     async def search_html(self, query: str, page: int = 1, fields: tuple[str, ...] = ("ti", "kw"),
-                          match: str = "es0") -> str:
+                          match: str = "es0", sort: str = "") -> str:
         """Fresh search every call (result sets are per-session and get overwritten), then jump to `page`."""
         data = [("qs0", query), *[("dcf", f) for f in fields], ("displayonerecdisable", "1"),
                 ("extrasearch", match), ("dbcode", "nclcdr"), ("_status_", "descrition_general")]
         resp = await self._session_request("POST", "/search", content=urlencode(data).encode(), headers=FORM)
+        if sort:  # the page's sort select submits the whole result form again with another sortby
+            form = parsers.result_form_fields(resp.text)
+            form["sortby"] = sort
+            resp = await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
         if page > 1:
             form = parsers.result_form_fields(resp.text)  # replay the whole form, as a browser would
             form.update({"jmpage": str(page), "jumpfmt1page": "跳至"})
@@ -61,11 +65,11 @@ class SessionApi:
         return (await self._session_request("GET", path)).text
 
     async def record_html(self, query: str, index: int, fields: tuple[str, ...] = ("ti", "kw"),
-                          match: str = "es0") -> str:
+                          match: str = "es0", sort: str = "") -> str:
         """Detail page of result number `index` (1-based, global) of a fresh search. Used for rows whose list
         entry carries no thesis id. Result sets are per-session and overwritten by any other query, so the
         search is repeated right before the lookup (and the page jump when needed)."""
-        await self.search_html(query, page=(index - 1) // PAGE_SIZE + 1, fields=fields, match=match)
+        await self.search_html(query, page=(index - 1) // PAGE_SIZE + 1, fields=fields, match=match, sort=sort)
         return (await self._session_request("GET", f"/record?r1={index}&h1=1")).text
 
 

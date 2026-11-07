@@ -24,6 +24,19 @@ FIELD_ALIASES = {  # the Chinese labels, so a model that copies them from the do
 FIELD_LABELS = {"ti": "論文名稱", "au": "研究生", "ad": "指導教授", "say": "口試委員", "kw": "關鍵詞", "ab": "摘要", "rf": "參考文獻"}
 MATCH_CODES = {"exact": "es0", "fuzzy": "es1", "homophone": "es2", "synonym": "es3"}  # 精準／模糊／同音／同義詞
 
+# the site's own `sortby` values (read from the result page's select); "" keeps the site default (relevance, desc)
+SORT_CODES = {
+    "relevance": "-.rule3", "relevance_asc": ".rule3",
+    "year_desc": "-yr", "year_asc": "yr",                      # 畢業學年度
+    "cited_desc": "-.total_bequote", "cited_asc": ".total_bequote",  # 被引用
+    "views_desc": "-.total_record", "views_asc": ".total_record",    # 點閱
+    "downloads_desc": "-.total_fulltext",                      # 下載
+    "title_asc": "tic", "title_desc": "-tic",                  # 論文名稱
+    "author_asc": "auc", "author_desc": "-auc",                # 研究生
+    "school_asc": "sc", "school_desc": "-sc",                  # 校院名稱
+}
+DEFAULT_SORT = ""
+
 DEFAULT_FIELDS = "title,keyword"
 DEFAULT_MATCH = "exact"
 
@@ -59,3 +72,14 @@ def describe(fields: tuple[str, ...], match: str) -> str:
     names = "、".join(FIELD_LABELS[f] for f in fields)
     mode = next(k for k, v in MATCH_CODES.items() if v == match)
     return f"欄位：{names}｜比對：{mode}"
+
+
+def resolve_sort(spec: str) -> str:
+    """'' (site default) | 'year_desc' | ... -> the site's sortby code ('' means: send nothing extra)."""
+    spec = (spec or "").strip().lower()
+    if not spec:
+        return ""
+    code = SORT_CODES.get(spec) or (spec if spec in SORT_CODES.values() else None)
+    if code is None:
+        raise NdltdError(f"不認得的排序 {spec!r}。可用：{', '.join(SORT_CODES)}；留空＝站方預設（相關度）。")
+    return code

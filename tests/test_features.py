@@ -167,3 +167,79 @@ def test_missing_foreign_names_do_not_print_nested_empty_parens():
     del d.fields["研究生(外文)"]
     out = parsers.format_detail(d, "x")
     assert "研究生：楊嘉勝\n" in out and "（（無））" not in out
+
+
+# ---- sorting
+from urllib.parse import parse_qs  # noqa: E402
+
+import httpx  # noqa: E402
+
+
+class SortingSite(FakeSite):
+    """Like the real site: a /result post with sortby=X answers with the page whose sort select shows X."""
+
+    def __call__(self, req: httpx.Request) -> httpx.Response:
+        resp = super().__call__(req)
+        if req.method == "POST" and str(req.url).endswith("/result"):
+            sort = parse_qs(req.content.decode(), keep_blank_values=True).get("sortby", [""])[0]
+            html = resp.text.replace('<option value="-.rule3" selected>', '<option value="-.rule3">')
+            html = html.replace(f'<option value="{sort}">', f'<option value="{sort}" selected>')
+            return httpx.Response(200, text=html)
+        return resp
+
+
+def result_posts(site):
+    return [parse_qs(b, keep_blank_values=True) for m, u, b in site.bodies if m == "POST" and u.endswith("/result")]
+
+
+def test_resolve_sort():
+    assert options.resolve_sort("") == ""
+    assert options.resolve_sort("year_desc") == "-yr"
+    assert options.resolve_sort("cited_desc") == "-.total_bequote"
+    assert options.resolve_sort("-yr") == "-yr"
+    with pytest.raises(NdltdError, match="排序"):
+        options.resolve_sort("random")
+
+
+async def test_default_sort_costs_no_extra_request():
+    site = SortingSite()
+    c = make(site)
+    await c.search_html("微積分")
+    assert result_posts(site) == []
+
+
+async def test_sort_adds_one_request_and_keeps_the_rest_of_the_form():
+    site = SortingSite()
+    c = make(site)
+    await c.search_html("微積分", sort="-yr")
+    posts = result_posts(site)
+    assert len(posts) == 1 and posts[0]["sortby"] == ["-yr"]
+    assert posts[0]["_status_"] == ["searchresult"] and "jpsize" in posts[0] and "jumpfmt1page" not in posts[0]
+
+
+async def test_sort_is_kept_when_jumping_to_page_two():
+    site = SortingSite()
+    c = make(site)
+    await c.search_html("微積分", page=2, sort="-yr")
+    posts = result_posts(site)
+    assert len(posts) == 2
+    assert posts[1]["jmpage"] == ["2"] and posts[1]["sortby"] == ["-yr"]  # the sorted set, not the default one
+
+
+async def test_record_by_index_uses_the_same_sort():
+    site = SortingSite()
+    c = make(site)
+    await c.record_html("微積分", 21, sort="-yr")
+    posts = result_posts(site)
+    assert [p.get("sortby") for p in posts] == [["-yr"], ["-yr"]]
+    assert site.log[-1][1].endswith("/record?r1=21&h1=1")
+
+
+async def test_sort_tool_output_and_hints(monkeypatch):
+    site = SortingSite()
+    monkeypatch.setattr(server, "_client", make(site))
+    out = await call("ndltd_search", query="微積分", sort="year_desc")
+    assert "排序：year_desc" in out
+    assert "不認得的排序" in await call("ndltd_search", query="微積分", sort="random")
+    assert "請核對篇名" in await call("ndltd_abstract", query="微積分", index=3, sort="year_desc")
+    assert any(p.get("sortby") == ["-yr"] for p in result_posts(site))
