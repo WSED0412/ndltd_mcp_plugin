@@ -45,6 +45,16 @@ claude mcp add ndltd -- uv --directory "<專案資料夾完整路徑>" run ndltd
 4. 開擴充功能的「選項」頁，貼上 token，儲存。（預設埠 8765；可用環境變數 `NDLTD_BRIDGE_PORT` 更改，選項頁要同步。）
 5. 保持 Chrome 開著。第一次呼叫工具時會開出國圖分頁；若出現驗證碼，請你本人輸入，進到搜尋頁後再呼叫一次。
 
+### 用 Firefox 載入
+
+站方可能對特定瀏覽器設定檔限流（實測：同一個 IP，Firefox 正常、Chrome 被擋成空白頁）。擴充功能同時支援 Firefox：
+開 `about:debugging#/runtime/this-firefox` →「載入暫時性附加元件」→ 選 `extension/manifest.json`。
+token 與選項頁的步驟相同（Firefox 的暫時性附加元件在重開瀏覽器後需重新載入）。
+
+### 被擋成空白頁時
+
+不要重新整理、不要換 IP。先用瀏覽器手動確認自己能否進站；Chrome 被擋時可清除該網站的 cookie 與資料，或改用 Firefox。
+
 ## 狀態
 
 - 解析器、橋接口、客戶端邏輯都有離線測試（假站台與假擴充功能）。
