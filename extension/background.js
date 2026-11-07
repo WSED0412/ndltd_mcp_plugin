@@ -50,14 +50,39 @@ async function pageJob(job) {
   }
 }
 
+const SESSION_PATH = /\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z]+(\/|$)/;
+let lastTabId = null; // keep using the same tab for the chained requests of one operation
+
+function hasSession(tab) {
+  try { return SESSION_PATH.test(new URL(tab.url).pathname); } catch (e) { return false; }
+}
+
+function isEntryPage(tab) {
+  // the home page, or the login/captcha flow: the human is on their way in, do not interrupt
+  try { const p = new URL(tab.url).pathname; return p === "/" || p.includes("/login"); } catch (e) { return false; }
+}
+
+function pickTab(tabs) {
+  const withSession = tabs.filter(hasSession);
+  return (
+    withSession.find((t) => t.id === lastTabId) ||
+    withSession.find((t) => t.active) ||
+    withSession[0] ||
+    tabs.find(isEntryPage) ||
+    tabs.find((t) => t.active) ||
+    tabs[0]
+  );
+}
+
 async function runJob(job) {
   const tabs = await chrome.tabs.query({ url: "https://ndltd.ncl.edu.tw/*" });
   if (!tabs.length) {
     await chrome.tabs.create({ url: HOME, active: true });
     return { ok: false, kind: "nosession", error: "opened ndltd tab" };
   }
-  const tab = tabs.find((t) => t.active) || tabs[0];
+  let tab = pickTab(tabs);
   await waitComplete(tab.id);
+  tab = await chrome.tabs.get(tab.id);
   let res;
   try {
     const out = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pageJob, args: [job] });
@@ -66,9 +91,11 @@ async function runJob(job) {
     res = { ok: false, kind: "nosession", error: String(e) };
   }
   if (!res) res = { ok: false, kind: "nosession", error: "no result from page" };
-  // Tab already shows the captcha: leave it alone, the human is typing. No session at all, or an expired one
-  // that answered with the captcha page: bring the tab to the entry page once so the human gets a fresh one.
-  if (res.kind === "nosession" || (res.ok && res.html.includes("驗證碼檢查機制"))) {
+  if (res.ok) lastTabId = tab.id;
+  // A tab already on the entry/captcha flow is left alone (the human may be typing). A tab with no session that
+  // is somewhere else, or one whose expired session answered with the captcha page, goes to the entry page once.
+  const expired = res.ok && res.html.includes("驗證碼檢查機制");
+  if ((res.kind === "nosession" && !isEntryPage(tab)) || expired) {
     await chrome.tabs.update(tab.id, { url: HOME, active: true });
   }
   return res;

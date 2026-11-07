@@ -63,6 +63,14 @@ class SearchPage:
     rows: list[SearchRow] = field(default_factory=list)
 
 
+def _after_label(lines: list[str], label: str) -> str:
+    for x in lines:
+        m = re.match(rf"{label}\s*[:：]\s*(.*)", x)
+        if m:
+            return m.group(1).strip()
+    return ""
+
+
 def _row_thesis_id(td: Node) -> str | None:
     html = td.html or ""
     for pat in (r"dbid=([0-9A-Za-z]+)", r"id(?:%3D|=)%22([0-9A-Za-z]+)%22"):
@@ -87,8 +95,8 @@ def parse_search(html: str) -> SearchPage:
         meta = next((x for x in lines[1:] if "／" in x), "")
         parts = [p.strip() for p in meta.split("／")]
         parts += [""] * (6 - len(parts))
-        author = next((x.split(":", 1)[1].strip() for x in lines if x.startswith("研究生:")), "")
-        advisor = next((x.split(":", 1)[1].strip() for x in lines if x.startswith("指導教授:")), "")
+        author = _after_label(lines, "研究生")
+        advisor = _after_label(lines, "指導教授")
         num = td.parent.css_first("td.tdfmt1-second") if td.parent else None
         idx = int(re.sub(r"\D", "", num.text()) or 0) if num else 0
         ft = re.search(r"電子全文\s*\(([^)]*)\)", td.text())
@@ -119,12 +127,11 @@ def parse_detail(html: str) -> Detail:
     fields: dict[str, str] = {}
     for th in tree.css("th.std1"):
         label = _clean(th.text()).rstrip(":：").strip()
-        td = th.next
-        while td is not None and td.tag != "td":
-            td = td.next
+        row = th.parent  # stay inside this <tr>: a header row without a <td> must not borrow the next row's cell
+        td = row.css_first("td") if row is not None else None
         if not label or td is None or label.startswith("本論文永久網址"):
             continue
-        val = _clean(_node_text(td).replace("\n", ""))
+        val = "、".join(x for x in (_clean(l) for l in _node_text(td).split("\n")) if x)
         if label == "相關次數":
             val = _clean(td.text(separator=" "))
         fields[label] = val
@@ -137,8 +144,10 @@ def parse_detail(html: str) -> Detail:
         handle = m.group(1)
 
     # Tab labels and tab bodies appear in the same order; the first body is the bibliographic table.
-    labels = [_clean(a.attributes.get("title") or "") for a in tree.css(".yui-nav li a")]
-    bodies = tree.css(".yui-content > div")
+    # The page has several tab groups (record, user tools, related papers); only the record group is ours.
+    scope = tree.css_first("#gs32_levelrecord") or tree
+    labels = [_clean(a.attributes.get("title") or "") for a in scope.css(".yui-nav li a")]
+    bodies = scope.css(".yui-content > div")
     by_label: dict[str, Node] = {}
     # Newer pages list "論文基本資料" as the first tab (labels and bodies then line up from 0); the older layout
     # has no such tab and the first body is the bibliographic table. Extra blank/widget tabs may trail either.

@@ -86,14 +86,18 @@ class _Handler(BaseHTTPRequestHandler):
         if urlparse(self.path).path != "/poll":
             return self._reply(404, {"error": "not found"})
         b.last_poll = time.monotonic()
-        try:
-            job = b.jobs.get(timeout=POLL_SECONDS)
-        except queue.Empty:
-            b.last_poll = time.monotonic()
+        deadline = time.monotonic() + POLL_SECONDS
+        while True:
             try:
-                return self._reply(204)
-            except OSError:  # poller already gone; nothing to hand over
-                return None
+                job = b.jobs.get(timeout=max(0.0, deadline - time.monotonic()))
+            except queue.Empty:
+                b.last_poll = time.monotonic()
+                try:
+                    return self._reply(204)
+                except OSError:  # poller already gone; nothing to hand over
+                    return None
+            if job["id"] in b.pending:  # a job whose caller gave up (timeout/cancel) is dropped here, never run
+                break
         b.last_poll = time.monotonic()
         try:
             self._reply(200, job)
@@ -106,13 +110,16 @@ class _Handler(BaseHTTPRequestHandler):
             return self._reply(403, {"error": "forbidden"})
         if urlparse(self.path).path != "/result":
             return self._reply(404, {"error": "not found"})
-        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return self._reply(400, {"error": "bad length"})
         if n > MAX_BODY:
             return self._reply(413, {"error": "too large"})
         try:
             res = json.loads(self.rfile.read(n).decode("utf-8"))
             fut = b.pending.pop(res["id"])
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError):
             return self._reply(400, {"error": "bad result"})
         if not fut.done():
             fut.set_result(res)
@@ -162,25 +169,14 @@ class Bridge:
         try:
             return await asyncio.wait_for(asyncio.wrap_future(fut), timeout)
         except asyncio.TimeoutError:
-            self.pending.pop(job["id"], None)
-            self._drop(job["id"])
             if not self.extension_alive:
                 raise NdltdNetworkError(
                     "Chrome 擴充功能沒有連上橋接口。請確認已載入擴充功能、在選項頁貼上 token、Chrome 正在執行。"
                 ) from None
             raise NdltdNetworkError(f"瀏覽器 {timeout:.0f} 秒內沒有回應這個工作；請檢查 ndltd 分頁。") from None
-
-    def _drop(self, job_id: str) -> None:
-        kept = []
-        while True:
-            try:
-                j = self.jobs.get_nowait()
-            except queue.Empty:
-                break
-            if j["id"] != job_id:
-                kept.append(j)
-        for j in kept:
-            self.jobs.put(j)
+        finally:
+            # timeout, cancellation or any error: the job must not run later and clobber the session's result set
+            self.pending.pop(job["id"], None)
 
 
 class _Page:

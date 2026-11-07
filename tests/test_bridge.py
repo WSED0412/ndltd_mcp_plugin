@@ -101,13 +101,16 @@ async def test_extension_not_connected_times_out_clearly(bridge, monkeypatch):
     monkeypatch.setattr(bridge, "submit", lambda job, timeout=0.3, _s=bridge.submit: _s(job, timeout))
     with pytest.raises(NdltdNetworkError, match="擴充功能沒有連上"):
         await c.search_html("x")
-    assert bridge.jobs.empty()  # the abandoned job was withdrawn
+    assert not bridge.pending  # the abandoned job is no longer awaited
 
 
 def test_job_is_requeued_when_poller_hangs_up(bridge):
     import socket
     import time
 
+    import concurrent.futures
+
+    bridge.pending["j1"] = concurrent.futures.Future()
     bridge.jobs.put({"id": "j1", "method": "GET", "path": "/x", "body": None})
     s = socket.create_connection(("127.0.0.1", bridge.port))
     crlf = chr(13) + chr(10)
@@ -116,3 +119,25 @@ def test_job_is_requeued_when_poller_hangs_up(bridge):
     time.sleep(0.5)
     st, data = http_call(bridge, "GET", "/poll")
     assert st == 200 and json.loads(data)["id"] == "j1"
+
+
+async def test_cancelled_caller_never_leaves_a_runnable_job(bridge):
+    import asyncio
+
+    task = asyncio.create_task(bridge.submit({"method": "GET", "path": "/x", "body": None}, timeout=30))
+    await asyncio.sleep(0.2)
+    assert len(bridge.pending) == 1
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not bridge.pending
+    # a poller must not be handed the abandoned job: the poll skips it and ends with 204 after its window
+    import ndltd_mcp.bridge as bm
+
+    bm.POLL_SECONDS = 0.5
+    assert http_call(bridge, "GET", "/poll")[0] == 204
+
+
+def test_bad_post_bodies_are_400_not_500(bridge):
+    assert http_call(bridge, "POST", "/result", body="[]")[0] == 400
+    assert http_call(bridge, "POST", "/result", body="null")[0] == 400

@@ -95,7 +95,7 @@ async def test_blank_page_raises_and_does_not_retry():
     c = make(site)
     with pytest.raises(NdltdBlockedError):
         await c.search_html("微積分")
-    assert len(site.log) == 2  # home + entry, then stop: no retry
+    assert len(site.log) == 1  # blank already on the home page: stop before the next request
 
 
 async def test_search_reuses_session():

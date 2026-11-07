@@ -103,3 +103,37 @@ def test_detail_new_layout_with_basic_info_tab():
     d = parsers.parse_detail(html)
     assert d.abstract_zh == "中文摘要內容" and d.abstract_en == "English abstract"
     assert d.handle == "11296/36zjzz" and d.notes == []
+
+
+def test_search_row_accepts_fullwidth_colon():
+    html = """<body>檢索結果共 1 筆資料<table><tr><td class="tdfmt1-second">1.</td>
+    <td class="tdfmt1-content"><table><tr><td class="std2"><a class="slink">題目</a></td></tr>
+    <tr><td class="std2">某大學／某系／100／碩士／甲門／乙類</td></tr>
+    <tr><td class="std2">研究生：王小明</td></tr><tr><td class="std2">指導教授：李老師</td></tr></table></td></tr></table></body>"""
+    r = parsers.parse_search(html).rows[0]
+    assert (r.author, r.advisor) == ("王小明", "李老師")
+
+
+def test_detail_multivalue_cells_are_joined_not_glued_and_rows_do_not_leak():
+    html = """<body><table>
+    <tr><th class="std1">論文名稱:</th><td class="std2">題目</td></tr>
+    <tr><th class="std1">指導教授:</th><td class="std2"><a>張三</a><br><a>李四</a></td></tr>
+    <tr><th class="std1">單獨的標題列:</th></tr>
+    <tr><th class="std1">校院名稱:</th><td class="std2">某大學</td></tr></table></body>"""
+    d = parsers.parse_detail(html)
+    assert d.get("指導教授") == "張三、李四"
+    assert d.fields.get("單獨的標題列") in (None, "")  # no borrowing from the next row
+    assert d.get("校院名稱") == "某大學"
+
+
+def test_detail_only_reads_the_record_tab_group():
+    html = """<body><table><tr><th class="std1">論文名稱:</th><td class="std2">題目</td></tr></table>
+    <div id="gs32_usercommand"><ul class="yui-nav"><li><a title="share"></a></li><li><a title="摘要"></a></li></ul>
+    <div class="yui-content"><div>廣告</div><div><table><tr><td class="stdncl2">錯的摘要</td></tr></table></div></div></div>
+    <div id="gs32_levelrecord"><ul class="yui-nav"><li><a title="論文基本資料"></a></li><li><a title="摘要"></a></li>
+    <li><a title="外文摘要"></a></li></ul>
+    <div class="yui-content"><div>basic</div>
+    <div><table><tr><td class="stdncl2">對的中文摘要</td></tr></table></div>
+    <div><table><tr><td class="stdncl2">right english</td></tr></table></div></div></div></body>"""
+    d = parsers.parse_detail(html)
+    assert d.abstract_zh == "對的中文摘要" and d.abstract_en == "right english"

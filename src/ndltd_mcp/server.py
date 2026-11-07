@@ -38,6 +38,20 @@ def get_client():
     return _client
 
 
+def _start_bridge_early() -> None:
+    """Listen as soon as the server starts so the extension is already connected at the first call.
+    A busy port is not fatal here (e.g. a second Claude session); the first request reports it."""
+    if os.environ.get("NDLTD_MODE") == "http":
+        return
+    try:
+        get_client().bridge.start()
+    except NdltdError:
+        pass
+
+
+_start_bridge_early()
+
+
 def _tool(fn):
     @functools.wraps(fn)
     async def wrapper(*a, **kw):

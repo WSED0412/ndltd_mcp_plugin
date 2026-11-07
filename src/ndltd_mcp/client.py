@@ -116,7 +116,12 @@ class NdltdClient(SessionApi):
             out = await self._raw("GET", ch.action, params=data)
         else:
             out = await self._raw("POST", ch.action, content=urlencode(data).encode(), headers=FORM)
-        if parsers.page_kind(out.text) != "ok":
+        kind = parsers.page_kind(out.text)
+        if kind == "blank":
+            raise NdltdBlockedError(
+                "國圖回了「Blank page」，這是站方的限流／封鎖。請停止，等幾小時後再試；不要重試或換 IP 繞過。"
+            )
+        if kind != "ok":
             raise NdltdCaptchaRequired("驗證碼未通過（可能輸入錯誤）。請再呼叫一次，不會自動重試。")
         return out
 
@@ -133,9 +138,16 @@ class NdltdClient(SessionApi):
         self._adopt(resp)
         return resp
 
+    @staticmethod
+    async def _checked_home(resp: httpx.Response) -> None:
+        if parsers.page_kind(resp.text) == "blank":  # site already refuses us: do not send the next request
+            raise NdltdBlockedError(
+                "國圖回了「Blank page」，這是站方的限流／封鎖。請停止，等幾小時後再試；不要重試或換 IP 繞過。"
+            )
+
     async def _ensure_session(self) -> str:
         if self.ccd is None:
-            await self._raw("GET", HOME)
+            await self._checked_home(await self._raw("GET", HOME))
             await self._checked(await self._raw("GET", ENTRY.format(ts=int(time.time() * 1000))))
         if self.ccd is None:
             raise NdltdNetworkError("進站後沒有取得 session（網址裡找不到 ccd=…）。")
