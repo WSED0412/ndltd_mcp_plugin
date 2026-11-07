@@ -1,0 +1,10 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>NDLTD MCP Bridge 設定</title>
+<style>body{font:15px sans-serif;max-width:560px;margin:40px auto;padding:0 16px}input{width:100%;padding:6px;margin:4px 0 14px;box-sizing:border-box}code{background:#eee;padding:1px 4px}</style>
+<h2>NDLTD MCP Bridge</h2>
+<p>token 在本機的 <code>%USERPROFILE%\.ndltd_mcp\token</code>（第一次啟動 ndltd-mcp 時自動產生）。整行複製貼上即可。</p>
+<label>Token<input id="token" type="password" autocomplete="off"></label>
+<label>埠（預設 8765）<input id="port" type="number" value="8765"></label>
+<button id="save">儲存</button> <span id="msg"></span>
+<script src="options.js"></script>

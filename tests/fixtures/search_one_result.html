@@ -1,0 +1,1619 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-Hant-TW">
+
+
+<script language="javascript">
+testCookie =navigator.cookieEnabled
+if (testCookie){
+}else{
+window.location = "/gs32/nocookiemsg.htm";
+}
+</script>
+    
+
+
+
+<head>
+<!-- GlobalShare 3.2, Copyright 2005 FlySheet Information Services, Inc. -->
+
+
+<title>臺灣博碩士論文知識加值系統：自由的博碩士學位論文全文資料庫 (現在位置：論文查詢)</title>
+
+<!--[if lt IE 7.]>
+<script defer type="text/javascript" src="/gs32/nclcdr/pngfix.js"></script>
+<![endif]-->
+
+<meta http-equiv="imagetoolbar" content="no" />
+<meta http-equiv="Content-Language" content="zh-TW">
+<meta name="Distribution" content="Taiwan">
+<meta name="360-site-verification" content="66485fbdbaf6542627aa835779bb644f" />
+<meta name="Robots" content="INDEX,FOLLOW">
+<meta name="robots" content="noarchive">
+<meta name="keywords" content="免費PDF，免費全文，免費論文，寫論文，查資料，找資料，找論文，下載電子全文，學位論文，碩博士論文，博碩士論文，期刊，中文期刊，期刊論文，期刊文章，電子期刊，會議論文，研討會論文，CETD，ETD，eThesys，論文下載，學位論文系統，中文，華文，電子資料庫，全文資料庫，學術文獻，參考文獻，教育部，高教司，國圖，國家圖書館，CNDLTD，NDLTD，全國博碩士論文資訊網，全國博碩士論文摘要檢索系統，臺灣博碩士論文知識加值系統，論文，台大論文，師大論文，政大論文，成大論文，中山論文，交大論文，中央論文，清大論文，淡江論文，輔大論文，文化大學論文，東海論文，國家博碩士論文數位圖書館，搜尋引擎，網路服務資源，電子書，政府資訊，考試資訊，雲端服務，雲端書目，雲端書庫，研究所考試，研究所考古題">
+<meta name="description" content="落實Open Access自由、平等、開放精神的全國博碩士論文資訊網">
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta forua="true" http-equiv="Cache-Control" content="max-age=86400"/>
+
+
+
+<!-- _initscript.htm -->
+
+
+<!-- yui's js prototype.js bbfix.js showcontext.js /gs32/webform.js flyjs.js >> all.js -->
+<!-- template2/_js_combine.htm -->
+
+
+<!-- flybase's combine js file-->
+<script type="text/javascript" src="/gs32/myjs/all.js?v=1650361290.0"></script>
+<script type="text/javascript" src="/gs32/myjs/clipboard.min.js?v=1650361290.0"></script>
+
+
+
+<script type="text/javascript">
+var errxmlrequest = "系統無法執行你的操作，請重新操作。錯誤代碼："
+//set timeout option enable or disable
+_timeoutflag = 0;
+
+//search input value clear enable or disable
+var _clearsearchflag = 1;
+
+//window.open close time 10000 = 10 seconds
+opener_close_time = 10000;
+var gs32path="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/";
+var openajaxmsg=0;
+var ajaxactdisp=0;
+var jstimer = 300
+var autocompurl = '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/getsquerystr'
+var autocomplist = [];
+var oldautocomplist = [];
+autocomplist[0] = '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/getsquerystr'
+oldautocomplist[0] = '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/getsquerystr'
+
+document.onkeypress = keyhandler;
+document.onkeyup = keyuphandler;
+
+
+//brwfield select onchange
+function brwstatus(formval, indval, buval, ckstr, selind)
+{
+var f = document.forms[formval]
+var ScanL = ckstr.split('||')
+var oaceslist =[oACDS0]
+//can't find field => user select to none field limit
+if (ScanL.indexOf(indval) == -1)
+{
+//ps("con-1");
+//initautocomplete()
+oaceslist[selind].scriptQueryAppend= "&cache="+(new Date()).getTime();
+try{f.elements[buval].disabled = true;}
+catch (e) {}
+
+}
+//find field => user select one field 
+else{
+oaceslist[selind].scriptQueryAppend= "&field="+ScanL[ScanL.indexOf(indval)]+"&selind="+selind+"&cache="+(new Date()).getTime()+"&";
+//autocomplist[selind] = autocompurl + "?&field="+ScanL[ScanL.indexOf(indval)]+"&selind="+selind+"&cache="+(new Date()).getTime()+"&";
+//ps("con-2", autocomplist[selind]);
+try{f.elements[buval].disabled = false;}
+catch (e) {}
+
+}
+//YAHOO.example.ACFlatData.init();
+}
+
+</script>
+<!-- tpec/_css.htm -->
+
+
+<link rel=stylesheet type="text/css" href="/gs32/css/style-min.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/css/myperson.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/yui/yui2.3.0/build/tabview/assets/tabview.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/yui/yui2.3.0/build/tabview/assets/skins/sam/tabview_flybase2007.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/css/module_tabs.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/yui/yui2.3.0/build/calendar/assets/skins/sam/calendar.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/yui/yui2.1.0/build/menu/assets/menu.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/yui/yui2.1.0/build/container/assets/container.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/css/meta.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/reset.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/fontset.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/css/template2.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/etds.css?v=1650361290.0">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/nclcdr-min.css?v=1650361290.0">
+
+<link rel="image_src" type="image/jpeg" href="https://ndltd.ncl.edu.tw/gs32/nclcdr/standunit.png" />
+
+<script type="text/javascript">
+<!--
+function MM_swapImgRestore() { //v3.0
+  var i,x,a=document.MM_sr; for(i=0;a&&i<a.length&&(x=a[i])&&x.oSrc;i++) x.src=x.oSrc;
+}
+function MM_preloadImages() { //v3.0
+  var d=document; if(d.images){ if(!d.MM_p) d.MM_p=new Array();
+    var i,j=d.MM_p.length,a=MM_preloadImages.arguments; for(i=0; i<a.length; i++)
+    if (a[i].indexOf("#")!=0){ d.MM_p[j]=new Image; d.MM_p[j++].src=a[i];}}
+}
+
+function MM_findObj(n, d) { //v4.01
+  var p,i,x;  if(!d) d=document; if((p=n.indexOf("?"))>0&&parent.frames.length) {
+    d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}
+  if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i<d.forms.length;i++) x=d.forms[i][n];
+  for(i=0;!x&&d.layers&&i<d.layers.length;i++) x=MM_findObj(n,d.layers[i].document);
+  if(!x && d.getElementById) x=d.getElementById(n); return x;
+}
+
+function MM_swapImage() { //v3.0
+  var i,j=0,x,a=MM_swapImage.arguments; document.MM_sr=new Array; for(i=0;i<(a.length-2);i+=3)
+   if ((x=MM_findObj(a[i]))!=null){document.MM_sr[j++]=x; if(!x.oSrc) x.oSrc=x.src; x.src=a[i+2];}
+}
+//-->
+</script>
+
+
+<!-- _timeout.htm -->
+
+
+<link rel=stylesheet type=text/css href=/gs32/myjs/jscalendar-1.0/skins/aqua/theme.css?v=1650361290.0 />
+<script language=JavaScript src="/gs32/myjs/jscalendar-1.0/calendar.js?v=1650361290.0"></script>
+<script language=JavaScript src="/gs32/myjs/jscalendar-1.0/calendar-setup.js?v=1650361290.0"></script>
+<script language=JavaScript src="/gs32/myjs/jscalendar-1.0/lang/calendar-big5-utf8.js?v=1650361290.0"></script>
+
+ 
+<SCRIPT language=JavaScript1.1>
+exiturl = "/gs32/nclcdr/timeoutpage.htm"; 
+sessionexiturl = "/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/exit";
+<!--
+	var secondsleft = 30 * 60;
+	var showntimeout = false; // has the alert been shown?
+	var timewin; // handle for the timeout warning window
+	var remind = 10 * 60; // remind user when this much time is left
+
+        orgsecs = secondsleft
+	function fsUnload() {
+		cleartimeout();
+		// BEGIN: FSPage plugin for the JS-onUnload() event.
+		
+		// END: FSPage plugin for the JS-onUnload() event.
+	}
+        // this browse onreload or close , excute this action
+	function cleartimeout() {
+		if ((timewin != null) && !(timewin.closed)){
+			timewin.close();
+                }
+	}
+	function showtimeout() {
+		if (secondsleft <= 0){
+                        //ps("no timie!", exiturl);
+                        //parWin = window.opener;
+                        //parWin.location.href = exiturl
+                        if (exiturl != ""){
+                        //window.location.href = exiturl;
+                        //force close session
+
+                        //try{showInfo_htm('', sessionexiturl)}
+                        //catch (err) {}
+
+                        //parent.location.href = exiturl;
+
+                        } 
+                        //self.close();
+			return;
+                }
+		if (showntimeout == false && secondsleft > 0 && secondsleft <= remind) {
+                        //timeoutmsg('系統通知',30,'/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/browse','<h4>親愛的使用者：<br>您好，由於您的畫面閒置時間已超過40分鐘，本系統將於600秒後自動將您的檢索結束，若您欲繼續使用，請按"繼續使用"</h4>','繼續使用');
+			showntimeout = true;
+		}
+		var minutes = Math.floor (secondsleft / 60);
+		var seconds = secondsleft % 60;
+		if (seconds < 10)
+			seconds = "0" + seconds;
+
+                try{ 
+		if (_timeoutflag){
+
+                 rvs = toLatin("系統通知" + minutes + ":" + seconds);
+                 //window.status = rvs;
+                 try{ document.getElementById("timestatus").innerHTML = rvs;}
+                 catch(err) {
+                 window.status = rvs;  
+                 }  
+                 }
+                } catch (err) {}
+		var period = 1;
+		setTimeout("showtimeout()", period*1000);
+		secondsleft -= period;
+	}
+	// -->
+</SCRIPT>
+<script language="JavaScript"> var _version = 1.0 </script>
+<script language="JavaScript1.1"> _version = 1.1 </script>
+<script language="JavaScript1.2"> _version = 1.2 </script>
+
+<script language="JavaScript1.1">
+function toLatin(x) {
+	if (_version >= 1.2 && ("zh" == "fr" || "zh" == "es")) {
+		var pattern = new RegExp("&#([0-9]+);");
+		while ((result = pattern.exec(x)) != null) {
+			x = x.replace(result[0], String.fromCharCode(RegExp.$1));
+		}
+		x = x.replace(/&nbsp;/g, ' ');
+	}
+	return (x);
+}
+</script>
+
+
+<script>
+try{
+var parWin = window.opener;
+parWin.secondsleft = orgsecs;
+}
+catch (err){}
+</script>
+
+<span id="keepsessionalive"></span>
+
+<!-- new keepsessionalive:900000(900 seconds) -->
+<script>
+window.setTimeout(function (){showInfo_htm('keepsessionalive', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/gs32keepalive?init=1');}, 900000);
+</script>
+        
+
+
+
+</head>
+
+
+
+
+<body     onLoad="showtimeout(); " 
+ onUnload="fsUnload();closeopen();" class="yui-skin-sam" id="bodyid"
+ style="font-size:11pt;"><!--字級大小控制-->
+
+
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_spring.css?v=1650361290.0" title="spring">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_summer.css?v=1650361290.0" title="summer">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_fall.css?v=1650361290.0" title="fall">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_winter.css?v=1650361290.0" title="winter">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_ncl.css?v=1650361290.0" title="ncl">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_night.css?v=1650361290.0" title="night">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_vac1.css?v=1650361290.0" title="vac1">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_vac2.css?v=1650361290.0" title="vac2">
+<link rel=stylesheet type="text/css" href="/gs32/nclcdr/css/type_vac3.css?v=1650361290.0" title="vac3">
+<script type="text/javascript" src="/gs32/myjs/styleswitcher.js?v=1650361290.0"></script>
+
+
+
+
+
+
+
+
+<script>
+
+//Specify affected tags. Add or remove from list:
+//var tgs = new Array( 'div','td','tr');
+var tgs = new Array('');
+
+//Specify spectrum of different font sizes:
+//var szs = new Array( 'xx-small','x-small','small','medium','large','x-large','xx-large' );
+var addrange = 21;
+var szs = new Array('7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27');
+var startSz = 4;
+
+// 讀取cookie's fontsize 
+var cookie_fontsize = readCookie("fontsize");
+
+// 設定初使值font-size 及 切換index 開始位置
+for(c=0; c < szs.length; c++){
+if (szs[c] == cookie_fontsize){
+    startSz = c;
+    setfontsize(cookie_fontsize);
+    break
+}
+}
+
+// 預設的font size index IN szs
+//ps("startSz", startSz);
+
+function ts(inc) {
+	if (!document.getElementById) return
+	var sz = startSz,i,j,cTags;
+	
+	sz += inc;
+	if ( sz < 0 ) {
+            sz = 0;
+            alert("this is smallest!");
+        }
+
+	if ( sz > addrange ) {
+        sz = addrange;
+            alert("this is biggest!");
+        }
+
+	startSz = sz;
+        nowfontsize = szs[ sz ];
+        //ps("nowfontsize", nowfontsize);
+        setfontsize(nowfontsize)  
+}
+
+// 變更文字大小
+function setfontsize(thisfontsize){
+    var d = document,cEl = null
+    if (!(cEl = d.getElementById("body"))) {
+       cEl = d.getElementsByTagName("body")[0];}
+    cE1 = d.getElementById("bodyid")
+    //ps("thisfontsize", thisfontsize);
+    cEl.style.fontSize = thisfontsize+'pt'; 
+    createCookie("fontsize",thisfontsize, 365);
+
+    // 設定預設的font size index
+    for(c=0; c < szs.length; c++){
+       if (szs[c] == thisfontsize){
+           startSz = c;
+           break
+       }
+    }
+}
+
+</script>
+
+
+<!-- lastsearch() => combine last search observer --> 
+<!-- showtimeout();fsUnload() => javascript window's bottom menu display timer --> 
+<!-- closeopen() => close all window.open function -->
+<!-- bb_init() => store browser history --> 
+
+<script>
+function getScrollTop() {
+  if ( document.documentElement.scrollTop )
+    return document.documentElement.scrollTop;
+
+  return document.body.scrollTop;
+}
+
+function scrollHandler() {
+   var e = document.getElementById('loading');
+   e.style.top = getScrollTop();
+}
+
+window.onscroll = function () {
+   var elem = document.getElementById('loading');
+   if ( !elem.currentStyle || elem.currentStyle.position != 'absolute' ) {
+      window.onscroll = null;
+   } else {
+      window.onscroll = function () { elem.style.top = getScrollTop(); };
+      document.getElementById('loading').style.top = getScrollTop();
+   }
+}
+
+PX1 = 0;
+PX2 = 0;
+PY1 = 0;
+PY2 = 0;
+function refset() {
+  if (document.layers) {
+    PX1 = window.innerWidth - 100;
+    if (PX1 < 0) PX1 = 0;
+    PY1 = window.pageYOffset;
+    if (PY1 < 0) PY1 = 0;
+    if (PX1 != PX2) {
+      document.layers.loading.left = PX1;
+      PX2 = PX1;
+    }
+    if ( PY1 != PY2) {
+      document.layers.loading.top = PY1;
+      PY2=PY1;
+    }
+  } else {
+    PX1 = document.body.clientWidth - 100;
+    if (PX1 < 0) PX1 = 0;
+    PY1 = document.body.scrollTop;
+    if (PY1 < 0) PY1 = 0;
+    if(PX1 != PX2 || PY1 != PY2) {
+      document.all.loading.style.display = "none";
+      document.all.loading.style.left = PX1 + 50;
+      PX2 = PX1;
+      document.all.loading.style.top = PY1;
+      PY2 = PY1;
+      document.all.loading.style.display = "none";
+    }
+  }
+  setTimeout("refset()", 50);
+}
+</script>
+
+<DIV ID="loading" STYLE="position:absolute;display: none;">
+資料載入處理中...
+</DIV>
+
+<!-- HTM::nclcdr/searchresult.htm  -->
+<!-- session.pid:fb32__nclcdr__--UWYECv--14251(25) -->
+
+<form method=post name=main action="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/result">
+
+<!-- whereami=>nclcdr/nclcdr1_head.htm  -->
+
+
+
+<!-- whereami=>nclcdr/_basic_head.htm  -->
+
+
+<a href="#maincontent" id="gotocenter" title="跳到主要內容" tabindex="1" class="sr-only sr-only-focusable">跳到主要內容</a>
+<div class="etds_mainbd">
+  <h1>
+    <div class="system_header"  onclick="window.location.href='/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?mode=basic';" onkeypress="window.location.href='/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?mode=basic';"  style="cursor :pointer;">
+      <span class="sr-only">臺灣博碩士論文加值系統</span>
+    </div>
+  </h1>
+  <table width="100%" border="0" cellspacing="0" cellpadding="0">
+    <tr>
+      <td width="10" background="/gs32/nclcdr/image/etds_mbg_l.gif"></td>
+      <td class="etds_mainct"> 
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tr>
+            <td height="100px;" valign="top"><div class="subnav">
+
+<!-- whereami=>nclcdr/nclcdr_headoption.htm  -->
+
+
+
+
+<table><tr><td>
+<a class="accesskey" title="上方功能區塊" style="font-size:8pt" accesskey="U" href="#">:::</a>
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/nclcdrsitemap" title="網站導覽">網站導覽</a>|
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?mode=basic" title="首頁">首頁</a>|
+<a href="https://ndltd.ncl.edu.tw/r/about" title="關於本站(另開新視窗)" rel="noopener noreferrer" target="_blank">關於本站</a>|
+<a href="https://cloud.ncl.edu.tw/get_contact.php" title="聯絡我們(另開新視窗)" rel="noopener noreferrer" target="_blank">聯絡我們</a>|
+<a href="https://www.ncl.edu.tw/" title="國圖首頁(另開新視窗)" rel="noopener noreferrer" target="_blank">國圖首頁</a>|
+<a href="https://ndltd.ncl.edu.tw/r/faq" title="常見問題(另開新視窗)" rel="noopener noreferrer" target="_blank">常見問題</a>|
+<a target=_blank rel="noopener noreferrer" href="https://ndltd.ncl.edu.tw/r/manual" title="操作說明(另開新視窗)">操作說明</a>
+<!--<a href="#" title="相關網站">相關網站</a>|-->
+</td></tr>
+<tr><td style="text-align:right;">
+<a href="https://etds.ncl.edu.tw?v=2018" title="English">English</a>
+|<a href="https://www.facebook.com/ndltdTW" title="FB 專頁(另開新視窗)" rel="noopener noreferrer" target="_blank">FB 專頁</a>
+|<a href="https://ndltd.ncl.edu.tw/r/mobile" title="Mobile">Mobile</a>
+<!--(<a href="https://ndltd.ncl.edu.tw/r/appdownload" tilte="App下載" rel="noopener noreferrer" target="_blank">App下載</a>)-->
+</td></tr>
+</table>
+</div>
+               <div class="login_bar">
+<div class="user_area">
+<font>免費會員</font>
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/registry" title="登入">登入</a>|
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/registry?newacc=1&step=1" title="註冊">註冊</a>
+</div>
+               </div>
+              </td>
+          </tr>
+          <tr>
+            <td>
+               <div class="cc_bar">
+                <ul>
+                  <li><a href="#XX"  onclick="setActiveStyleSheet('spring')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){setActiveStyleSheet('spring')}" ><img src="/gs32/nclcdr/image/cc_a.gif" 
+ title="版面粉紅色" alt="版面粉紅色" /></a>
+<noscript><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?switchcss=type_spring.css" title="切換版面粉紅色">切換版面粉紅色</a></noscript>
+                  </li>
+                  <li><a href="#XX"  onclick="setActiveStyleSheet('summer')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){setActiveStyleSheet('summer')}" ><img src="/gs32/nclcdr/image/cc_b.gif" 
+ title="版面綠色" alt="版面綠色" /></a>
+<noscript><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?switchcss=type_summer.css" title="切換版面綠色">切換版面綠色</a></noscript>
+</li>
+                  <li><a href="#XX"  onclick="setActiveStyleSheet('fall')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){setActiveStyleSheet('fall')}" ><img src="/gs32/nclcdr/image/cc_c.gif" 
+ title="版面橘色" alt="版面橘色" /></a>
+<noscript><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?switchcss=type_fall.css" title="切換版面橘色">切換版面橘色</a></noscript>
+</li>
+                  <li><a href="#XX"  onclick="setActiveStyleSheet('winter')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){setActiveStyleSheet('winter')}" ><img src="/gs32/nclcdr/image/cc_d.gif" 
+ title="版面淡藍色" alt="版面淡藍色" /></a>
+<noscript><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?switchcss=type_winter.css" title="切換版面淡藍色">切換版面淡藍色</a></noscript>
+</li>
+                  <li><a href="#XX"  onclick="setActiveStyleSheet('ncl')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){setActiveStyleSheet('ncl')}" ><img src="/gs32/nclcdr/image/cc_e.gif" 
+ title="版面黃色" alt="版面黃色" /></a>
+<noscript><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?switchcss=type_ncl.css" title="切換版面黃色">切換版面黃色</a></noscript>
+</li>
+                  <li><a href="#XX"  onclick="setActiveStyleSheet('night')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){setActiveStyleSheet('night')}" ><img src="/gs32/nclcdr/image/cc_f.gif" 
+ title="版面藍色" alt="版面藍色" /></a>
+<noscript><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?switchcss=type_night.css" title="切換版面藍色">切換版面藍色</a></noscript>
+</li>
+                </ul>
+              </div>
+              </div>
+
+              <div class="nav">
+
+
+<ul class="version">
+<li>
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?webmgemode=general&mode=basic"><img src="/gs32/nclcdr/image/etds_vah.gif" alt="一般民眾" name="Image8" width="" height="24" border="0" id="Image8" /></a>
+</li>
+<li>
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?webmgemode=researcher&mode=advance" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('Image9','','/gs32/nclcdr/image/etds_vbh.gif',1)" onfocus="" onblur=""><img src="/gs32/nclcdr/image/etds_vb.gif" alt="研究人員" name="Image9" width="" height="24" border="0" id="Image9" /></a>
+</li>
+<li>
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/webmge?webmgemode=graduate&mode=advance" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('Image10','','/gs32/nclcdr/image/etds_vch.gif',1)" onfocus="" onblur=""><img src="/gs32/nclcdr/image/etds_vc.gif" alt="校院系所及研究生" name="Image10" height="24" border="0" id="Image10" /></a>
+</li>
+    </ul>
+
+<!-- whereami=>nclcdr/_searchmodeswitch.htm  -->
+
+<ul class="mainnav"><h2><span class="sr-only">功能切換導覽列</span></h2>
+<li><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/search?mode=basic" title="論文查詢"><img src="/gs32/nclcdr/image/etds_nav_01.gif" 
+        alt="論文查詢" /></a></li>
+<li><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/gsimpactbrw?init=1&date=114" title="排行榜"><img src="/gs32/nclcdr/image/etds_nav_04.gif" 
+        alt="排行榜" /></a></li>
+<li><a href="https://estudio.ncl.edu.tw/" title="影音圖像" rel="noopener noreferrer" target='_blank'><img src="/gs32/nclcdr/image/video_1.png" 
+        alt="影音圖像" /></a></li>
+<li><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/subjectareasearch?init=1" title="主題館(另開新視窗)" rel="noopener noreferrer" rel="noopener noreferrer" target="_blank"><img src="/gs32/nclcdr/image/etds_nav_e02.gif" 
+              alt="主題館(另開新視窗)" /></a></li>
+<li><a href="https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/registry" title="我的研究室"><img src="/gs32/nclcdr/image/etds_nav_05.gif" 
+        alt="我的研究室" /></a></li>
+<li><a href="https://oatd.org/" title="NDLTD查詢(另開新視窗)" rel="noopener noreferrer"  rel="noopener noreferrer" target="_blank"><img src="/gs32/nclcdr/image/etds_nav_06.gif" 
+        alt="NDLTD查詢(另開新視窗)" /></a></li>
+</ul>
+
+
+
+              </div></td>
+          </tr>
+          <tr>
+            <td>
+<div class="user_div">
+(104.28.232.15) 您好！臺灣時間：2026/11/07 21:35
+
+</div>
+
+
+
+<div class="fontsize_control">
+字體大小：
+
+<a href="javascript:ts(1);"><img src="/gs32/nclcdr/image/etds_icon_fb.gif" alt="字級放大" align="absmiddle" /></a>
+&nbsp;
+<a href="javascript:ts(-1);"><img src="/gs32/nclcdr/image/etds_icon_fs.gif" alt="字級縮小" align="absmiddle" /></a>
+&nbsp;
+<a href="#XX"  onclick="setfontsize('11');"    onkeypress="setfontsize('11');"  title="預設字形"><img src="/gs32/nclcdr//image/etds_icon_fd.gif" alt="預設字形" border=0 align="absmiddle" ></a>
+&nbsp;
+<noscript>字級大小SCRIPT，如您的瀏覽器不支援，IE6請利用鍵盤按住ALT鍵 + V → X → (G)最大(L)較大(M)中(S)較小(A)小，來選擇適合您的文字大小，如為IE7或Firefoxy瀏覽器則可利用鍵盤 Ctrl + (+)放大 (-)縮小來改變字型大小。</noscript>
+<script>setActiveStyleSheet('ncl')</script>
+<noscript><br/>字體大小變更功能，需開啟瀏覽器的JAVASCRIPT功能</noscript>
+</div>
+</td>
+          </tr>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div id="result">
+<!-- HTM::result.htm  -->
+
+<script>
+window.setTimeout(function (){window.location.href = '#result';},0);
+</script>
+   
+<div id="sendmailmsg">
+</div>
+
+<!-- <a name=top /></a> -->
+
+<script>
+try{document.getElementById("loading").style.display;}
+catch(err){}
+window.setTimeout(function (){hide_image();},1);
+</script>
+
+
+
+
+
+<tr>
+   <td>
+
+      <div class="cont_l2">
+
+<!-- nclcdr/contentbrowse.htm -->
+
+<script>
+window.setTimeout(function (){window.location.href = '#result';},0);
+</script>
+
+<script>
+msg = ''; 
+if (msg){
+alert(msg);
+}
+
+// recommand use
+
+</script>
+
+
+<script>
+try{document.getElementById("loading").style.display;}
+catch(err){}
+window.setTimeout(function (){hide_image();},1);
+</script>
+
+
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0" class="border_cube">
+                <tr>
+                  <a class="accesskey" style="color:#D5D723;font-size:8pt;position:absolute;z-index:2;" title="中央區塊" id="maincontent" accesskey="C" href="#">:::</a>
+                  <td class="title_bg"><h3 class="title_n1" id="maincontent"><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/search?mode=basic" title="簡易檢索">簡易檢索</a></h3></td>
+                </tr>
+
+
+              <tr><td>
+
+
+
+  <table width="95%" border="0" align="center" cellpadding="0" cellspacing="0">
+     <tr>
+     <td colspan="2" id="result" headers="start">
+<h3><img src="/gs32/nclcdr/image/script.png" alt="" align="absmiddle" />檢索結果
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="suggest_span" id="suggest_area" onclick="showInfo_htm('suggest_area', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/suggest_area?h1=1', '資料載入處理中...')"    onkeypress="evt = event || window.event; if (evt.keyCode == 13){showInfo_htm('suggest_area', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/suggest_area?h1=1', '資料載入處理中...')};" ><a href="#XX">點我看建議檢索詞</a></span>
+  </h3>
+     </td>
+     </tr>
+
+  </table>
+
+
+<input type=hidden name="gosort" value="">
+
+
+<table cellspacing=0 border=0 class="brwrestable">
+<tr>
+<td headers="start" colspan=3>
+
+  <tr>
+   <td width="25" id="start">&nbsp;</td>
+   <td headers="start">
+檢索策略：<span class="etd_e">"微積分學習策略".ti(精準)</span>；檢索結果共<span class="etd_e">&nbsp;1&nbsp;</span>筆資料 <a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/search?mode=basic#histarea" title="檢視檢索歷史"><img src="/gs32/nclcdr/image/histbrw.gif" alt="檢視檢索歷史" title="檢視檢索歷史"></a>
+<br />
+<!-- _researcharea.htm -->
+
+    <div id="researchdivid" style="">
+    
+
+    在搜尋的結果範圍內查詢：<label for=research><input class=inputbox name=research id=research size=20  onmouseover="this.select();this.focus();"  onfocus="this.select();this.focus();" ></label>
+    
+<label for="researchfld"><select name=researchfld>
+<option value="">不限欄位</option>
+<option value="ti">論文名稱</option>
+<option value="au">研究生</option>
+<option value="asc">校院名稱</option>
+<option value="sdp">系所</option>
+<option value="pyr">論文出版年</option>
+<option value="ad">指導教授</option>
+<option value="kw">關鍵詞</option>
+<option value="tc">論文目次</option>
+<option value="ab">摘要</option>
+<option value="rf">論文參考文獻</option>
+<option value="yr">畢業學年度</option>
+</select></label>
+<input type=submit name=researchok class=button value='確定'  onclick="return ckdomidexist('research', '請輸入再檢索字串!')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){return ckdomidexist('research', '請輸入再檢索字串!')}" >
+</div>
+</td>
+  </tr>
+
+</table>
+
+
+
+
+              </td><tr>
+              <tr><td align=center>
+ 
+
+<div class="search_bar">
+
+<table cellspacing=0 width="100%">
+<tr>
+<td align="center">
+
+<td align=center><input type=hidden name="switchfmt" id="switchfmt" value="">
+<label for="selchgfmt"><select name=selchgfmt id=selchgfmt onChange="switchfmtfunc()">
+<option value="1">表格式
+<option value="9" selected>條列式
+</select></label>
+</td>
+
+<td align=center><!--
+<input type=button class="button" id="ctx" name=bbrw value='檢視星狀圖' onclick="javascript:starshow('/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/scupiostar', 'star')" id="ctx">
+-->
+
+
+<script type="text/javascript">
+  YAHOO.namespace("example.container");
+  YAHOO.example.container.tt1 = new YAHOO.widget.Tooltip("tt1", 
+   { context:"ctx", text:"Scupio Star Readme" });
+</script>
+</td>
+
+<td>
+
+<label for='sortby'>
+排序：
+</label>
+<select name=sortby id=sortby onFocus="initSelectSortby();">
+  <option value="">請選擇排序欄位
+
+      <option value=".rule3">相關度(遞增)
+      <option value="-.rule3" selected>相關度(遞減)
+          
+
+      <option value="auc">研究生(遞增)
+      <option value="-auc">研究生(遞減)
+          
+
+      <option value="aue">研究生(外文)(遞增)
+      <option value="-aue">研究生(外文)(遞減)
+          
+
+      <option value="tic">論文名稱(遞增)
+      <option value="-tic">論文名稱(遞減)
+          
+
+      <option value="tie">論文名稱(外文)(遞增)
+      <option value="-tie">論文名稱(外文)(遞減)
+          
+
+      <option value="sc">校院名稱(遞增)
+      <option value="-sc">校院名稱(遞減)
+          
+
+      <option value="yr">畢業學年度(遞增)
+      <option value="-yr">畢業學年度(遞減)
+          
+
+      <option value="aun">研究生(原姓名)(遞增)
+      <option value="-aun">研究生(原姓名)(遞減)
+          
+
+      <option value="sglv1">學門(遞增)
+      <option value="-sglv1">學門(遞減)
+          
+
+      <option value="sglv2">學類(遞增)
+      <option value="-sglv2">學類(遞減)
+          
+
+      <option value=".total_bequote">被引用(遞增)
+      <option value="-.total_bequote">被引用(遞減)
+          
+
+      <option value=".total_record">點閱(遞增)
+      <option value="-.total_record">點閱(遞減)
+          
+
+      <option value=".total_score">評分(遞增)
+      <option value="-.total_score">評分(遞減)
+          
+
+      <option value=".total_fulltext">下載(遞增)
+      <option value="-.total_fulltext">下載(遞減)
+          
+
+      <option value=".total_favority">收藏(遞增)
+      <option value="-.total_favority">收藏(遞減)
+          
+</select>
+
+<script>
+ function initSelectSortby()
+{
+	var theSelect = document.getElementById("sortby");
+	theSelect.changed = false;
+	theSelect.onfocus = selectFocussed;
+	theSelect.onchange = selectChanged;
+	theSelect.onkeydown = selectKeyed;
+	theSelect.onclick = selectClicked;
+	return true;
+}
+
+function selectChanged(theElement)
+{
+	var theSelect;	
+	if (theElement && theElement.value)
+	{
+		theSelect = theElement;
+	}
+	else
+	{
+		theSelect = this;
+	}
+	if (!theSelect.changed)
+	{
+		return false;
+	}
+	theSelect.form.submit();
+	return true;
+}
+
+function selectClicked()
+{
+	this.changed = true;
+}
+
+function selectFocussed()
+{
+	this.initValue = this.value;
+	// return true;
+}
+
+function selectKeyed(e)
+{
+	var theEvent;
+	var keyCodeTab = "9";
+	var keyCodeEnter = "13";
+	var keyCodeEsc = "27";
+	
+	if (e)
+	{
+		theEvent = e;
+	}
+	else
+	{
+		theEvent = event;
+	}
+
+	if ((theEvent.keyCode == keyCodeEnter))
+	{
+		this.changed = true;
+		selectChanged(this);
+	}
+	else if (theEvent.keyCode == keyCodeEsc)
+	{
+		this.value = this.initValue;
+	}
+	else
+	{
+		this.changed = false;
+	}
+	return true;
+}
+</script>
+
+
+
+</td>
+
+<td>
+<table ><tr>
+<td><img src="/gs32/nclcdr/image/gofirst_.gif" border="0" alt="第一頁"></td>
+<td><img src="/gs32/nclcdr/image/goprev_.gif" border="0" alt="上一頁"></td>
+<td><img src="/gs32/nclcdr/image/gonext_.gif" border="0" alt="下一頁"></td>
+<td><img src="/gs32/nclcdr/image/golast_.gif" border="0" alt="最後一頁"></td>
+</tr></table>
+</td>
+<td align="center">
+<label for="jmpage"><input type=text id="jmpage" name="jmpage" value="1" class="text_jpg" ></label>
+/1<font class=gs32sys_12pt>頁</font>
+<input type=submit class="button" name="jumpfmt1page" value="跳至" title="點我換頁">
+</td><td align="center">
+<input type=hidden id="SubmitChangePage" name="SubmitChangePage" value="">
+<label for="jpsize">每頁顯示</label>
+<select id=jpsize name=jpsize onfocus="initSelect();" >
+<option value="10"> 10
+<option value="20" selected>20
+<option value="30"> 30
+<option value="50"> 50
+<option value="100"> 100
+</select>筆
+
+</td></tr></table>
+<input type=hidden name="gofirst" value="">
+<input type=hidden name="goprev" value="">
+<input type=hidden name="gonext" value="">
+<input type=hidden name="golast" value="">
+<input type=hidden name="jpage" value="">
+<input type=hidden name="psize" value="">
+<input type=hidden name="chgfmt" value="">
+
+<script>
+ function initSelect()
+{
+        var theSelect = document.getElementById("jpsize");
+        theSelect.changed = false;
+        theSelect.onfocus = selectFocussed;
+        theSelect.onchange = selectChanged;
+        theSelect.onkeydown = selectKeyed;
+        theSelect.onclick = selectClicked;
+        return true;
+}
+
+function selectChanged(theElement)
+{
+        var theSelect;
+        if (theElement && theElement.value)
+        {
+                theSelect = theElement;
+        }
+        else
+        {
+                theSelect = this;
+        }
+        if (!theSelect.changed)
+        {
+                return false;
+        }
+        document.getElementById('SubmitChangePage').value='1';
+        theSelect.form.submit();
+        return true;
+}
+
+function selectClicked()
+{
+        this.changed = true;
+}
+
+function selectFocussed()
+{
+        this.initValue = this.value;
+        // return true;
+}
+
+function selectKeyed(e)
+{
+        var theEvent;
+        var keyCodeTab = "9";
+        var keyCodeEnter = "13";
+        var keyCodeEsc = "27";
+
+        if (e)
+        {
+                theEvent = e;
+        }
+        else
+        {
+                theEvent = event;
+        }
+
+        if ((theEvent.keyCode == keyCodeEnter))
+        {
+                this.changed = true;
+                selectChanged(this);
+        }
+        else if (theEvent.keyCode == keyCodeEsc)
+        {
+                this.value = this.initValue;
+        }
+        else
+        {
+                this.changed = false;
+        }
+        return true;
+}
+</script>
+
+
+</div>
+
+              </td><tr>
+
+
+              <tr><td>
+
+<div id="dragDiv"  class="Popup">
+  <div id="cntnt"></div>
+</div>
+
+
+
+
+<table cellspacing=0 cellpadding=1 align=center id="tablefmt1">
+<!-- fmt1head.htm -->
+
+
+    <tr>
+    <th class=mainth1 nowrap>
+<input type=button class=button id="search_flag_ckall" value="全選"
+ onClick="schallchk('0' ,'searchlist', 'search_flag_ckall', '', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/getchecker', '全選', '清除')"></span>
+            </th>
+    <th class=mainth2>&nbsp;</th>
+    
+<th nowrap class=mainth width=90%%>書目資料(<B>有 <img src="/gs32/nclcdr/image/book-open.png" alt="fulltext" align="absmiddle"> 者，表示該論文之電子全文已獲授權於網際網路開放免費下載。</B>)</th></tr>
+
+
+<tr ><td class="tdfmt1-first"><label for="sel1" value="1"><input type=checkbox id="sel1" value="1" name="sel1" value="1" onclick="checker('0', 'sel1','1', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/getchecker')"></label></td><td nowrap class="tdfmt1-second">1.</td>
+    <td class="tdfmt1-content"><div class="divtabout_simplefmt1"><div class="leftdiv"><table class="tableoutsimplefmt2"><tr>
+    <td colspan=2 id="simplefmt2td" style="display:none">simplefmt2td</td></tr><tr>
+    <td headers="simplefmt2td" class="std2" colspan=2><a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/record?r1=1&h1=1" class="slink"><span class="etd_d">大一學生<font class=inverse>微積分學習策略</font>與微積分學習成效之研究</span></a></td></tr><tr>
+    <td headers="simplefmt2td" class="std2" colspan=2>國立交通大學／應用數學系所／99／碩士／數學及統計學門／數學學類</td></tr><tr>
+    <td headers="simplefmt2td" class="std2" colspan=2>研究生:楊嘉勝</td></tr><tr>
+    <td headers="simplefmt2td" class="std2" colspan=2>指導教授:白啟光</td></tr><tr>
+    <td headers="simplefmt2td" class="std2" colspan=2>論文種類 : 學術論文</td></tr><tr>
+    <td headers="simplefmt2td" class="std2" colspan=2>
+<!-- totalfunc-start -->
+<img src="/gs32/nclcdr//image/book-open.png" alt="電子全文" title="電子全文" width="16" height="16"  align="absmiddle" />&nbsp;<a href="#XXX"  onclick="nclconfirmlogin('親愛的使用者您好!提醒您下載全文時，請先入登入您的會員帳號。', 'https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/registry?gourl=/cgi-bin/gs32/gsweb.cgi/ccd%3DUWYECv/search%3Fs%3Did%3D%22099NCTU5507087%22.%26openfull%3D1%26setcurrent%3D1')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){nclconfirmlogin('親愛的使用者您好!提醒您下載全文時，請先入登入您的會員帳號。', 'https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/registry?gourl=/cgi-bin/gs32/gsweb.cgi/ccd%3DUWYECv/search%3Fs%3Did%3D%22099NCTU5507087%22.%26openfull%3D1%26setcurrent%3D1')}"  title="電子全文">電子全文</a><br><img src="/gs32/nclcdr//image/book1-open.png" alt="國圖紙本論文" title="國圖紙本論文" width="16" height="16"  align="absmiddle" />&nbsp;<a href="#XXX"  onclick=" winopen('alewin', 'https://ncltw.primo.exlibrisgroup.com/nde/fulldisplay?tab=LibraryCatalog&search_scope=MyInstitution&vid=886NCL_INST:LIB&lang=zh-tw&docid=alma990029662490209684') " onkeypress="evt = event || window.event; if (evt.keyCode == 13){ winopen('alewin', 'https://ncltw.primo.exlibrisgroup.com/nde/fulldisplay?tab=LibraryCatalog&search_scope=MyInstitution&vid=886NCL_INST:LIB&lang=zh-tw&docid=alma990029662490209684') }"  title="國圖紙本論文">國圖紙本論文</a>
+<!-- totalfunc-end -->
+</td></tr><tr>
+    <td headers="simplefmt2td" colspan=2>
+<!-- totalfunc-start -->
+<ul class="hotarea_ul"><li><img src="/gs32/images/hotgifs/quote.png" alt="被引用" class="hotsortfocusimg">被引用:<a href="#XXX" title="引用此筆資料列表" onclick="window.open('/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/nclcdrbequote?dbid=099NCTU5507087', 'quotelnk')" onkeypress="evt = event || window.event; if (evt.keyCode == 13){window.open('/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/nclcdrbequote?dbid=099NCTU5507087', 'quotelnk')}" >15</a></li><li ><img src="/gs32/images/hotgifs/target.png" alt="點閱" class="hotsortfocusimg">點閱:1062</li><li class="starli"><img src="/gs32/images/hotgifs/star.png" alt="評分" class="hotsortfocusimg">評分:<!--scrore:0--><img src="/gs32/images/hotgifs/star-small-empty.png" width="8" align="absmiddle" alt="" /><img src="/gs32/images/hotgifs/star-small-empty.png" width="8" align="absmiddle" alt="" /><img src="/gs32/images/hotgifs/star-small-empty.png" width="8" align="absmiddle" alt="" /><img src="/gs32/images/hotgifs/star-small-empty.png" width="8" align="absmiddle" alt="" /><img src="/gs32/images/hotgifs/star-small-empty.png" width="8" align="absmiddle" alt="" /></li><li ><img src="/gs32/images/hotgifs/icon_review.gif" alt="下載" class="hotsortfocusimg">下載:197</li><li ><img src="/gs32/images/hotgifs/folder-horizontal-open.png" alt="收藏至我的研究室書目清單" class="hotsortfocusimg">書目收藏:1</li></ul>
+<!-- totalfunc-end -->
+</td></tr>
+</table></div><div class="rightdiv"></div></div></td>
+
+</tr>
+
+</table>
+
+
+
+<table cellspacing=0 width="100%"></tr>
+<tr><td width="100%" align="right">
+<table><tr><td>
+  
+<td><img src="/gs32/nclcdr/image/gofirst_.gif" border="0" alt="第一頁"></td>
+<td><img src="/gs32/nclcdr/image/goprev_.gif" border="0" alt="上一頁"></td>
+<td><img src="/gs32/nclcdr/image/gonext_.gif" border="0" alt="下一頁"></td>
+<td><img src="/gs32/nclcdr/image/golast_.gif" border="0" alt="最後一頁"></td>
+<td><a href="#gotocenter" title="top">top</a></td>
+</td></tr></table>
+</tr></table>
+
+
+<input type=hidden name=searchlist value="1">
+<input type=hidden name=r1 value="1">
+<input type=hidden name=d1 value="0">
+<input type=hidden name=h1 value="1">
+
+<input type=hidden name=option value="">
+
+
+
+</td></tr>
+
+</table>
+
+
+      </div>
+      <!--end of .cont_l2 -->
+
+
+
+<div class="cont_r2">
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0" class="border_cube">
+
+    <tr> <td height="10"></td> </tr>
+
+<tr><td>
+
+
+<table width="96%" border="0" align="center" cellpadding="0" cellspacing="0">
+
+<tr><td>
+
+<script>
+YAHOO.example.outputresult = function() {
+   var myTabs = new YAHOO.widget.TabView('gs32_outputresult');
+     myTabs.on('contentReady', function() {
+
+    this.getTab(0).addListener('keypress', handleClick=function(e){
+    var keyCode = e.keyCode;
+    if (keyCode == '13'){
+        myTabs.set('activeIndex', 0);
+    }});
+
+
+
+
+
+    this.getTab(1).addListener('keypress', handleClick=function(e){
+    var keyCode = e.keyCode;
+    if (keyCode == '13'){
+        myTabs.set('activeIndex', 1);
+
+showInfo_htm('keyarea','/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/refine_area', '資料載入處理中...')
+    }
+    });
+
+    try{
+    this.getTab(1).addListener('click', handleClick=function(e){
+showInfo_htm('keyarea','/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/refine_area', '資料載入處理中...')
+   });
+
+    } catch (err) {}
+
+
+
+
+
+
+
+    try{
+    this.getTab(2).addListener('keypress', handleClick=function(e){
+    var keyCode = e.keyCode;
+    if (keyCode == '13'){
+        myTabs.set('activeIndex', 2);
+winopen('tmpwin2', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/subjectmapd3?lv=1&init=1', '615/600/200/100')
+    }});
+
+    } catch (err) {}
+
+    try{
+    this.getTab(2).addListener('click', handleClick=function(e){
+winopen('tmpwin2', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/subjectmapd3?lv=1&init=1', '615/600/200/100')
+   });
+
+   } catch (err) {}
+
+
+
+
+    try{
+    this.getTab(3).addListener('keypress', handleClick=function(e){
+    var keyCode = e.keyCode;
+    if (keyCode == '13'){
+        myTabs.set('activeIndex', 3);
+showInfo_htm('clusterarea','/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/clusterarea', '資料載入處理中...')
+    }});
+
+    } catch (err) {}
+
+
+ 
+    try{
+    this.getTab(3).addListener('click', handleClick=function(e){
+showInfo_htm('clusterarea','/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/clusterarea', '資料載入處理中...')
+    });
+    } catch (err) {}
+
+
+   });
+};
+
+YAHOO.example.outputresult();
+</script>
+
+
+<div id="gs32_outputresult" class="yui-navset">
+
+<ul class="yui-nav">
+<li class="selected"><a href="#XX" title=""><em>輸出管理</em></a></li>
+<li><a href="#XX" title="result"><em>查詢結果分類</em></a></li>
+<li><a href="#XX" title="主題知識地圖"><em>主題知識地圖</em></a></li>
+<li><a href="#XX" title="聚類分析"><em>聚類分析</em></a></li>
+</ul>
+
+<div class="yui-content">
+
+<div id="輸出管理">
+<!-- nclcdr/_seloutput.htm -->
+
+
+
+<script>
+YAHOO.example.myinit = function() {
+   var myTabs = new YAHOO.widget.TabView('seloutputmenu');
+     myTabs.on('contentReady', function() { 
+
+ tab0 = myTabs.getTab(0);
+
+     function handleClick0(e) {
+     }
+         
+tab0.addListener('click', handleClick0);
+     });
+};
+
+YAHOO.example.myinit();
+</script>
+
+<style type="text/css">
+
+/* Tabmenu 包含整個(index tab)上方區塊 style */
+#seloutputmenu .yui-nav{
+border:solid #737374;
+border-width:0 0 3px 0;
+Xposition:relative;
+zoom:1;
+background:#FFFFFF;
+margin-top:2px;
+}
+/* Tabmenu (index tab)選項之間的間距 */
+#seloutputmenu .yui-nav li{
+margin:0px;
+padding:0 1px 0 0;
+print 'font-size:80%'
+}
+/* Tabmenu (index tab)選項 選擇後的效果 */
+#seloutputmenu .selected a, #seloutputmenu .selected a:focus, #seloutputmenu .selected a:hover
+{
+background: #D7D6D6 url('/gs32/images/cssgif/tabind003.gif') repeat-x bottom !important;
+}
+/* Tabmenu (index tab)選項 移過去 a:hover 效果 */
+#seloutputmenu a:hover{
+background:#C98F8F !important;
+margin:0px;
+padding:0px;
+}
+/* Table menu 下方的div 區塊 style */
+#seloutputmenu .yui-content {
+padding:1px;
+border:solid #808080;
+border-width: 0px;
+min-height:100px;
+/** 輸出區塊.設成0px.不能將此值設成important否則裡面的tabview border都會被設成此屬性 **/ 
+}
+
+</style>
+
+<table class="tmaintd" width="100%">
+
+<tr><td>
+
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+     <tr>
+     <td width="20" align="center" bgcolor="#f0ebe0" id="outputrecs">
+     <img src="/gs32/nclcdr/image/arrow-315-small.png" alt="" width="16" height="20" align="absbottom" /></td>
+     <td headers="outputrecs" align="left" bgcolor="#f0ebe0">輸出紀錄&nbsp;(輸出上限：30筆)</td>
+     </tr>
+
+<ul>
+
+     <tr><td headers="outputrecs" align="center">&nbsp;</td>
+     <td headers="outputrecs" align="left">
+      
+<label for="crange"><input type=radio id=crange name=crange value=1 checked>勾選紀錄</label>(<span id="stenow">0</span>)筆
+
+     </td>
+     </tr>
+      
+
+     <tr><td headers="outputrecs" align="center">&nbsp;</td>
+     <td headers="outputrecs" align="left">
+      
+<label for="crange2"><input type=radio id=crange2 name=crange value=2>所有勾選紀錄</label>(<span id="stetotal">0</span>)筆
+
+     </td>
+     </tr>
+      
+
+
+
+
+
+     <tr>
+     <td headers="outputrecs" height="3" colspan="2"></td>
+     </tr>
+
+
+
+     <tr>
+     <td headers="outputrecs" width="20" align="center" bgcolor="#f0ebe0">
+     <img src="/gs32/nclcdr/image/arrow-315-small.png" alt="" width="16" height="20" align="absbottom" /></td>
+     <td headers="outputrecs" align="left" bgcolor="#f0ebe0">輸出欄位 (完整欄位請先登入國圖會員帳號)</td>
+     </tr>
+
+
+
+     
+
+  <tr><td headers="outputrecs" align="center">&nbsp;</td>
+  <td headers="outputrecs" align="left">
+<label for="cfield1">
+<input type=radio id="cfield1" name=cfield value=1 checked onclick="onselectdivenable()">簡易書目
+</label>
+  </td>
+  </tr>
+
+
+
+
+     <tr>
+     <td headers="outputrecs" width="20" align="center" bgcolor="#f0ebe0">
+     <img src="/gs32/nclcdr/image/arrow-315-small.png" alt="" width="16" height="20" align="absbottom" /></td>
+     <td headers="outputrecs" align="left" bgcolor="#f0ebe0">書目資料輸出格式</td>
+     </tr>
+
+ <tr><td headers="outputrecs" align="center">&nbsp;</td>
+ <td headers="outputrecs" align="left">
+ <label for="cfield4">
+ <input type=radio name=cfield id="cfield4" value=4 onclick="onselectdivdisable()">APA Style
+ </label>
+ </td>
+ </tr> 
+  <tr><td headers="outputrecs" align="center">&nbsp;</td>
+ <td headers="outputrecs" align="left">
+ <label for="cfield5">
+ <input type=radio name=cfield id="cfield5" value=5 onclick="onselectdivdisable()">Chicago (Turabian) Style
+ </label>
+ </td>
+ </tr> 
+  <tr><td headers="outputrecs" align="center">&nbsp;</td>
+ <td headers="outputrecs" align="left">
+ <label for="cfield6">
+ <input type=radio name=cfield id="cfield6" value=6 onclick="onselectdivdisable()">MLA Style
+ </label>
+ </td>
+ </tr> 
+  <tr><td headers="outputrecs" align="center">&nbsp;</td>
+ <td headers="outputrecs" align="left">
+ <label for="cfield7">
+ <input type=radio name=cfield id="cfield7" value=7 onclick="onselectdivdisable()">CNS-13611 Style
+ </label>
+ </td>
+ </tr> 
+  <tr><td headers="outputrecs" align="center">&nbsp;</td>
+ <td headers="outputrecs" align="left">
+ <label for="cfield8">
+ <input type=radio name=cfield id="cfield8" value=8 onclick="onselectdivdisable()">CSE Style
+ </label>
+ </td>
+ </tr> 
+  <tr><td headers="outputrecs" align="center">&nbsp;</td>
+ <td headers="outputrecs" align="left">
+ <label for="cfield9">
+ <input type=radio name=cfield id="cfield9" value=9 onclick="onselectdivdisable()">RIS format(EndNote、RefWorks...)
+ </label>
+ </td>
+ </tr> 
+ 
+
+
+     <tr>
+     <td headers="outputrecs" width="20" align="center" bgcolor="#f0ebe0">
+     <img src="/gs32/nclcdr/image/arrow-315-small.png" alt="" width="16" height="20" align="absbottom" /></td>
+     <td headers="outputrecs" align="left" bgcolor="#f0ebe0">輸出字碼</td>
+     </tr>
+   
+     <tr>
+<td headers="outputrecs" align="center">&nbsp;</td>
+<td headers="outputrecs">
+<label for="char_fmt_utf8"> 
+<input type="radio" id="char_fmt_utf8" name="char_fmt" value="utf8" checked>UTF-8<br>
+</label>
+<label for="char_fmt_big5">
+<input type="radio" id="char_fmt_big5" name="char_fmt" value="big5">BIG5<br>
+</label>
+<label for="char_fmt_gb2312">
+<input type="radio" id="char_fmt_gb2312" name="char_fmt" value="gb2312">GB2312
+</label>
+     </td></tr>
+
+     <tr>
+     <td headers="outputrecs" height="3" colspan="2"></td>
+     </tr>
+
+</table>
+
+<script>
+YAHOO.example.outmailbrw = function() {
+   var myTabs = new YAHOO.widget.TabView('gs32_outmailbrw');
+     myTabs.on('contentReady', function() {
+   });
+};
+
+YAHOO.example.outmailbrw();
+</script>
+
+
+<div id="gs32_outmailbrw" class="yui-navset">
+    <ul class="yui-nav">
+
+<!---  seloutput LEVEL1 TITLE --->
+        <li class="selected"><a href="#XX"><label for="outfmt"><em>輸出</em></label></a></li>
+<!---  seloutput LEVEL2 TITLE --->
+
+
+
+
+
+
+
+<!---  seloutput LEVEL3 TITLE --->
+        <li><a href="#XX"><em>轉寄</em></a></li>
+<!---  seloutput LEVEL4 TITLE 預覽 --->
+
+<!---  預覽及輸出 --->
+<li><a href="#XX"><em>預覽及輸出</em></a></li>
+    </ul>
+
+
+    <div class="yui-content">
+<!---  seloutput LEVEL1 TITLE --->
+        <div>
+
+<select name=outfmt id=outfmt>
+<option value=txt>TXT檔
+<option value=xls>Excel
+<option value=ods>ods
+<option value=csv>CSV 檔
+<option value=htm>HTML檔
+<!--
+<option value=xml>Xml
+-->
+<option value=ncliso>iso2709
+<!--<option value=ncliso_marc21>iso2709 marc21-->
+</select>
+
+<input type=button class=button name=savefmt value="儲存" onclick="savefmtfunc(0 , 6, '無本次檢索勾選紀錄!', '無所有勾選紀錄!', '', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/resmage', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/history');">
+
+        </div>
+
+
+<!---  seloutput LEVEL2 TITLE --->
+
+
+
+<!---  seloutput LEVEL3 TITLE --->
+        <div>
+
+<label for="eaddr">
+<span class="gs32sys_span01">Email地址:</span>
+</label>
+<input type=text id=eaddr name=eaddr size=20>
+<br>
+<label for="etitle">
+<span class="gs32sys_span01">Email標題:</span>
+</label>
+<input type=text id=etitle name=etitle size=20><br>
+<label for="sendmail"><input type=button class=button id=sendmail name=sendmail value="確定" onclick="mailfmtfunc(0, 6, '無本次檢索勾選紀錄!', '無所有勾選紀錄!', '請輸入Email標題', '請輸入Email地址', '', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/resmage', '信件已寄送')">
+</label>
+        </div>
+
+<!---  seloutput LEVEL4 TITLE --->
+
+
+
+        <div>
+<input type=button class=button name=preview value="全螢幕預覽" onclick="brwfmtfunc(0, 6, '無本次檢索勾選紀錄!', '無所有勾選紀錄!', '&outfmt=htm', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/previewsave')"    onkeypress="brwfmtfunc(0, 6, '無本次檢索勾選紀錄!', '無所有勾選紀錄!', '&outfmt=htm', '/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/previewsave')"  >
+        </div>
+
+
+
+</div>
+
+</div>   <!-- _seloutput_resultbrw.htm -->
+
+<div id="retoutfmt">
+</div>
+
+
+</td></tr>
+</table>
+
+
+<div id="checker_buffer">
+<input type=hidden name="stenownum" id="stenownum" value="0">
+<input type=hidden name="stetotalnum" id="stetotalnum" value="0">
+</div>
+
+<script type="text/javascript">
+  YAHOO.namespace("example.container");
+  YAHOO.example.container.tt2 = new YAHOO.widget.Tooltip("tt2",
+   { context:"linkgrpins", text:"Scupio group Readme"});
+</script>
+
+</div>
+
+<div id="查詢結果分類">
+<div id="keyarea" style="float:left;">
+</div><!--keyarea-->
+</div>
+
+
+<div>以圖形方式呈現此查詢結果的主題知識地圖，以二層式的方式呈現，中心點為本次的查詢詞，第一層顯示與查詢詞最相關的五個關鍵詞，點選單一關鍵詞後，再以此關鍵詞為中心，顯示五個最相關的關鍵詞。</div>
+<div id="clusterarea">Cluster analysis ins</div>
+
+</div>
+
+
+</td></tr></table>
+
+
+</td></tr>
+
+    <tr> <td height="10"></td> </tr>
+
+</table>
+
+
+      </div>
+      <!--end of .cont_r2 -->
+
+
+
+
+
+
+
+   </td>
+</tr>
+
+</div>
+
+<input type=hidden name=opt value=m>
+
+
+
+          <tr>
+            <td><div class="footnav">
+			<table border="0" cellspacing="0" cellpadding="0">
+  <tr>
+    <td>&nbsp;</td>
+    <td><img src="/gs32/nclcdr/image/etds_footnav_l.gif" alt="" width="22" height="22" /></td>
+    <td bgcolor="#BABABA">
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/search?mode=basic" title="簡易查詢">簡易查詢</a>&nbsp;|
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/search?mode=advance" title="進階查詢">進階查詢</a>&nbsp;|
+<a href="/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/gsimpactbrw?init=1&date=114" title="熱門排行">熱門排行</a>&nbsp;|
+<a href="https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/ccd=UWYECv/registry" title="我的研究室">我的研究室</a>
+<br>
+</td>
+    <td><img src="/gs32/nclcdr/image/etds_footnav_r.gif" alt="" width="22" height="22" /></td>
+  </tr>
+</table>
+</div></td>
+          </tr>
+          <tr>
+            <td>
+
+
+
+
+<div class="footer">
+本系統(Web3)共收集：論文已授權全文：<span class=etd_e>867944</span> 筆、書目與摘要：<span class=etd_e>1570781</span> 筆<br>目前上線人數：<span class=etd_e title="25__費時：10.8155682087秒">22281</span>&nbsp;／&nbsp;訪客人次（自99年6月）：<span class=etd_e>860954485</span>&nbsp;／&nbsp;檢索次數（自99年6月）：<span class=etd_e>7222577245</span>&nbsp;／&nbsp;指導單位： <a href="http://www.edu.tw" target=_blank rel="noopener noreferrer" title="教育部高等教育司(另開新視窗)">教育部</a><br>國家圖書館著作權聲明 Copyright © 2010 All rights reserved.<br>本館地址：100201 臺北市中山南路20號 電話：02-2361-9132 （本系統服務窗口請轉分機 172、870）<br>本網站最佳瀏覽解析度為 1600 x 900
+
+
+<br>
+<a href="https://accessibility.moda.gov.tw/Applications/Detail?category=20210629174448" title="無障礙網站(另開新視窗)" rel="noopener noreferrer" target="_blank">
+<img src="/gs32/nclcdr/image/aplus_2a.jpg" border="0" width="88" height="31" alt="無障礙網站">
+</a>
+    
+</div>
+
+</td>
+          </tr>
+        </table></td>
+      <td width="10" background="/gs32/nclcdr/image/etds_mbg_r.gif" alt=""></td>
+    </tr>
+    <tr>
+      <td width="10" height="11"><img src="/gs32/nclcdr/image/etds_mbg_lb.gif" width="10" alt="" height="11" /></td>
+      <td height="11" background="/gs32/nclcdr/image/etds_mbg_b.gif" alt=""></td>
+      <td width="10" height="11"><img src="/gs32/nclcdr/image/etds_mbg_rb.gif" width="10" height="11" alt="" /></td>
+    </tr>
+  </table>
+</div><!--end of .etds_mainbd --> 
+
+<!-- _google_analysis.htm  -->
+
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-16875488-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+    
+
+
+
+<input type=hidden name=_status_ value="searchresult">
+</form>
+
+<iframe name="splink" id="splink" title="splink" width="0" height="0"
+  style="visibility: hidden; inline: none;">
+</iframe>
+<div id="gs32sysids">
+</div>
+</body>
+</html>
