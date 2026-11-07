@@ -27,6 +27,29 @@ function waitComplete(tabId, ms = 15000) {
   });
 }
 
+// Injected into the ndltd tab ONLY while a job runs (no resident content script, so ordinary browsing of the
+// site is untouched). Must be self-contained: it is serialized into the page. Runs a same-origin fetch under
+// the tab's own session (the ccd=XXXX path segment), exactly like the page's own forms. Never reads images.
+async function pageJob(job) {
+  const m = location.pathname.match(/^(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z]+)(?:\/|$)/);
+  if (!m) {
+    const captcha = ((document.body && document.body.innerText) || "").includes("驗證碼檢查機制");
+    return { ok: false, kind: captcha ? "captcha" : "nosession" };
+  }
+  const init = { method: job.method, credentials: "include", headers: {} };
+  if (job.body != null) {
+    init.body = job.body;
+    init.headers["Content-Type"] = "application/x-www-form-urlencoded";
+  }
+  try {
+    const r = await fetch(m[1] + job.path, init);
+    const html = await r.text();
+    return { ok: true, status: r.status, html };
+  } catch (e) {
+    return { ok: false, kind: "fetch", error: String(e) };
+  }
+}
+
 async function runJob(job) {
   const tabs = await chrome.tabs.query({ url: "https://ndltd.ncl.edu.tw/*" });
   if (!tabs.length) {
@@ -35,17 +58,20 @@ async function runJob(job) {
   }
   const tab = tabs.find((t) => t.active) || tabs[0];
   await waitComplete(tab.id);
+  let res;
   try {
-    const res = await chrome.tabs.sendMessage(tab.id, { type: "job", job });
-    if (res && res.kind === "nosession") {
-      await chrome.tabs.update(tab.id, { url: HOME, active: true }); // the human sees the captcha here
-    }
-    return res || { ok: false, kind: "nocontent", error: "no reply from page" };
+    const out = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pageJob, args: [job] });
+    res = out && out[0] && out[0].result;
   } catch (e) {
-    // content script gone (page was navigating, or the tab was open before the extension loaded)
-    await chrome.tabs.update(tab.id, { url: HOME, active: true });
-    return { ok: false, kind: "nosession", error: String(e) };
+    res = { ok: false, kind: "nosession", error: String(e) };
   }
+  if (!res) res = { ok: false, kind: "nosession", error: "no result from page" };
+  // Tab already shows the captcha: leave it alone, the human is typing. No session at all, or an expired one
+  // that answered with the captcha page: bring the tab to the entry page once so the human gets a fresh one.
+  if (res.kind === "nosession" || (res.ok && res.html.includes("驗證碼檢查機制"))) {
+    await chrome.tabs.update(tab.id, { url: HOME, active: true });
+  }
+  return res;
 }
 
 async function loop() {

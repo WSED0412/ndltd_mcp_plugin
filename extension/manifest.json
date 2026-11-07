@@ -3,21 +3,30 @@
   "name": "NDLTD MCP Bridge",
   "version": "0.1.0",
   "description": "讓本機的 ndltd-mcp 透過你自己的瀏覽器查詢臺灣博碩士論文書目與摘要（驗證碼由你本人輸入）。",
-  "permissions": ["storage", "alarms", "tabs"],
-  "host_permissions": ["http://127.0.0.1/*", "https://ndltd.ncl.edu.tw/*"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "https://ndltd.ncl.edu.tw/*"
+  ],
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
-  "content_scripts": [
-    {
-      "matches": ["https://ndltd.ncl.edu.tw/*"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ],
-  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "browser_specific_settings": {
-    "gecko": { "id": "ndltd-mcp-bridge@local", "strict_min_version": "121.0" }
+    "gecko": {
+      "id": "ndltd-mcp-bridge@local",
+      "strict_min_version": "121.0"
+    }
   }
 }
