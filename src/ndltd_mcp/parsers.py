@@ -117,6 +117,8 @@ class Detail:
     abstract_zh: str
     abstract_en: str
     notes: list[str] = field(default_factory=list)
+    toc: str = ""
+    references: str = ""
 
     def get(self, label: str) -> str:
         return self.fields.get(label) or NONE
@@ -156,18 +158,21 @@ def parse_detail(html: str) -> Detail:
         by_label.setdefault(lab, body)
     notes: list[str] = []
 
-    def block(label: str) -> str:
+    def block(label: str, required: bool = True) -> str:
         node = by_label.get(label)
         if node is None:
-            notes.append(f"頁面沒有「{label}」區塊")
+            if required:
+                notes.append(f"頁面沒有「{label}」區塊")
             return ""
         cell = node.css_first("td.stdncl2") or node
         return _node_text(cell)
 
-    return Detail(fields=fields, handle=handle, abstract_zh=block("摘要"), abstract_en=block("外文摘要"), notes=notes)
+    return Detail(fields=fields, handle=handle, abstract_zh=block("摘要"), abstract_en=block("外文摘要"), notes=notes,
+                  toc=block("目次", required=False), references=block("參考文獻", required=False))
 
 
-def format_detail(d: Detail, thesis_id: str | None = None) -> str:
+def format_detail(d: Detail, thesis_id: str | None = None, include_toc: bool = False,
+                  include_references: bool = False) -> str:
     def j(label: str) -> str:
         return d.get(label)
 
@@ -192,6 +197,10 @@ def format_detail(d: Detail, thesis_id: str | None = None) -> str:
         "【外文摘要】",
         d.abstract_en or NONE,
     ]
+    if include_toc:
+        out += ["", "【目次】", d.toc or NONE]
+    if include_references:
+        out += ["", "【參考文獻】", d.references or NONE]
     if d.notes:
         out += ["", "備註：" + "；".join(d.notes)]
     return "\n".join(out)

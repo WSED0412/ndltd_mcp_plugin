@@ -50,11 +50,12 @@ class FakeSite:
     """Minimal stand-in: first hit gives captcha (or blank), then a session, search, detail."""
 
     def __init__(self, mode="ok"):
-        self.mode, self.log, self.answer = mode, [], None
+        self.mode, self.log, self.answer, self.bodies = mode, [], None, []
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         u = str(req.url)
         self.log.append((req.method, u))
+        self.bodies.append((req.method, u, req.content.decode() if req.content else ""))
         if self.mode == "blank":
             return httpx.Response(200, text=BLANK)
         if u.rstrip("/") == "https://ndltd.ncl.edu.tw":

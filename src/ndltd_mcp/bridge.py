@@ -106,18 +106,19 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         b: Bridge = self.server.owner  # type: ignore[attr-defined]
-        if not self._authorized():
-            return self._reply(403, {"error": "forbidden"})
-        if urlparse(self.path).path != "/result":
-            return self._reply(404, {"error": "not found"})
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             return self._reply(400, {"error": "bad length"})
         if n > MAX_BODY:
             return self._reply(413, {"error": "too large"})
+        raw = self.rfile.read(n)  # always consume the body first, or a refusal can reset the client's connection
+        if not self._authorized():
+            return self._reply(403, {"error": "forbidden"})
+        if urlparse(self.path).path != "/result":
+            return self._reply(404, {"error": "not found"})
         try:
-            res = json.loads(self.rfile.read(n).decode("utf-8"))
+            res = json.loads(raw.decode("utf-8"))
             fut = b.pending.pop(res["id"])
         except (ValueError, KeyError, TypeError):
             return self._reply(400, {"error": "bad result"})
