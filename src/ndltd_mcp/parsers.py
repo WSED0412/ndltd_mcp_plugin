@@ -212,6 +212,13 @@ def format_detail(d: Detail, thesis_id: str | None = None, include_toc: bool = F
 
 
 
+def result_total(html: str) -> int | None:
+    """The total in '檢索結果共 N 筆', or None when the page does not say (not a result page)."""
+    gap = r"(?:\s|&nbsp;|<[^>]*>)*"  # the real page puts the number inside a <span> between 共 and 筆
+    m = re.search(rf"檢索結果共{gap}([\d,]+){gap}筆", html)
+    return int(m.group(1).replace(",", "")) if m else None
+
+
 def result_form_fields(html: str) -> dict[str, str]:
     """Every field the browser would post from the result page's paging form (action .../result), as a dict.
     The site wants the whole form back (hidden state like _status_=searchresult, searchlist, sortby ...),

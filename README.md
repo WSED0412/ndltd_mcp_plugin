@@ -8,9 +8,9 @@
 
 | Tool | 用途 |
 |---|---|
-| `ndltd_search(query, page=1, fields="title,keyword", match="exact", sort="")` | 搜尋。回傳總筆數＋本頁每筆（每頁 20 筆）的篇名、研究生、指導教授、學校系所、學年度、論文編號。`fields`：`title`（論文名稱）、`author`（研究生）、`advisor`（指導教授）、`committee`（口試委員）、`keyword`、`abstract`、`references`，逗號分隔，或 `all`。`match`：`exact`（預設）、`fuzzy`、`homophone`、`synonym`。**非精準模式只驗證過 `fuzzy`，而且它對常見詞回極大量無關結果**（實測「微積分」回三十多萬筆），輸出會附警告。`sort` 留空＝站方預設（相關度）；`year_desc`（要最新論文）、`year_asc`、`cited_desc`（被引用）、`views_desc`、`downloads_desc`、`title_asc`、`author_asc`、`school_asc` 等，指定排序會多發一個請求。用 `query`＋`index` 讀摘要或引用時，`sort` 要和搜尋時相同。 |
-| `ndltd_abstract(thesis_id)` 或 `ndltd_abstract(query, index, fields, match)` | 完整書目＋中英文摘要＋關鍵詞，選填 `include_toc`（目次）、`include_references`（參考文獻），兩者來自同一頁、不多發請求。列表沒有論文編號的論文（全文延後公開者），用原搜尋詞與搜尋結果的序號讀取（`fields`、`match` 要和當時相同）；回傳的篇名請與搜尋結果核對。 |
-| `ndltd_cite(thesis_id` 或 `query, index, format="apa")` | 學位論文引用：`apa`（APA 7，中文格式：`作者（年）。*篇名*〔碩士論文，校院〕。臺灣博碩士論文知識加值系統。網址`）、`bibtex`（`@mastersthesis`／`@phdthesis`）、`ris`（`TY - THES`），可匯入 Zotero、Mendeley、EndNote。年份用論文出版年（西元）。**APA 只支援中文姓名與中文篇名**（外文姓名要轉成「姓, 名縮寫」，自動轉換容易出錯），這時請用 bibtex／ris。引用只用詳目頁已有的欄位，請與原頁面核對。 |
+| `ndltd_search(query, page=1, fields="title,keyword", match="exact", sort="")` | 搜尋。回傳總筆數＋本頁每筆（每頁 20 筆）的篇名、研究生、指導教授、學校系所、學年度、論文編號。`fields`：`title`（論文名稱）、`author`（研究生）、`advisor`（指導教授）、`committee`（口試委員）、`keyword`、`abstract`、`references`，逗號分隔，或 `all`。`match`：`exact`（預設）、`fuzzy`、`homophone`、`synonym`。**非精準模式都不建議當預設**：`fuzzy` 對常見詞回極大量無關結果（實測「微積分」回三十多萬筆）；`synonym` 筆數多約五成且夾雜無關論文；`homophone` 只試過一例，與 `exact` 相同。輸出會附警告。`sort` 留空＝站方預設（相關度）；`year_desc`（要最新論文）、`year_asc`、`cited_desc`（被引用）、`views_desc`、`downloads_desc`、`title_asc`、`author_asc`、`school_asc` 等，指定排序會多發一個請求（`relevance` 等同預設，不多發）。**排序尚未在真實站台驗證：實測 `year_desc` 的結果順序和預設相同，疑似沒有生效**，輸出會附警告，請自行檢查學年度。用 `query`＋`index` 讀摘要或引用時，`sort` 要和搜尋時相同。 |
+| `ndltd_abstract(thesis_id)` 或 `ndltd_abstract(query, index, fields, match, sort, expected_title)` | 完整書目＋中英文摘要＋關鍵詞，選填 `include_toc`（目次）、`include_references`（參考文獻），兩者來自同一頁、不多發請求。列表沒有論文編號的論文（全文延後公開者），用原搜尋詞與搜尋結果的序號讀取（`fields`、`match`、`sort` 要和當時相同）；建議帶 `expected_title`（搜尋結果的提示已附上），取得的篇名不符就報錯，避免序號對到別篇。 |
+| `ndltd_cite(thesis_id)` 或 `ndltd_cite(query, index, …, expected_title, format="apa")` | 學位論文引用：`apa`（APA 7，中文格式：`作者（年）。*篇名*〔碩士論文，校院〕。臺灣博碩士論文知識加值系統。網址`）、`bibtex`（`@mastersthesis`／`@phdthesis`）、`ris`（`TY - THES`），可匯入 Zotero、Mendeley、EndNote。年份用論文出版年（西元）。**APA 只支援中文姓名的作者**（外文姓名要轉成「姓, 名縮寫」，自動轉換容易出錯，這時請用 bibtex／ris）；篇名是英文沒關係；沒有永久網址時引用會省略網址。引用只用詳目頁已有的欄位，請與原頁面核對。 |
 
 ## 為什麼要有瀏覽器擴充功能
 
@@ -89,5 +89,5 @@ claude mcp add --scope user ndltd -- uv --directory "<專案資料夾完整路�
 - 2026-11-08 在真實 Chrome 驗證過：搜尋（含第 2 頁、依指導教授）、用論文編號讀摘要（含目次與參考文獻）、用「搜尋詞＋序號」讀沒有編號的論文、APA 引用。
 - 比對方式實測（2026-11-08）：`synonym` 搜「人工智慧」比 `exact` 多（11,057 對 7,190 筆），多出的有寺廟彩畫、胡笳十八拍之類無關論文，雜訊不少；`homophone` 搜指導教授「蔡炎龍」與 `exact` 完全相同（都是 65 筆），只試了這一例，看不出它何時會多收。所以非精準模式都不建議當預設。
 - RIS 與 BibTeX 用 `rispy`、`bibtexparser` 實際解析過（`tests/test_formats.py`，套件為開發依賴，未安裝時自動略過）；尚未實際匯入 Zotero／EndNote。
-- 未驗證：session 有效期；排序參數對真實站台的效果（只有離線測試）；純 HTTP 模式的驗證碼表單欄位（瀏覽器橋接模式不需要）。
+- 未驗證：session 有效期；排序參數：實測未見效果，原因待查（離線測試通過，但假站台無法反映真實行為）；純 HTTP 模式的驗證碼表單欄位（瀏覽器橋接模式不需要）。
 - `NDLTD_MODE=http` 可改用純 HTTP 客戶端，但目前站方會擋（空白頁）。

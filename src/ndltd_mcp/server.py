@@ -4,6 +4,7 @@ from __future__ import annotations
 import functools
 import logging
 import os
+import re
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -63,17 +64,34 @@ def _tool(fn):
     return mcp.tool()(wrapper)
 
 
-async def _load_detail(thesis_id: str, query: str, index: int, fields: str, match: str, sort: str = ""):
+def _squash(s: str) -> str:
+    """For comparing titles: drop whitespace and straight quotes (the list and the detail page may differ there)."""
+    return re.sub(r"[\s\u3000\"']+", "", s or "")
+
+
+def _check_title(d, expected_title: str) -> None:
+    if expected_title and _squash(d.fields.get("論文名稱", "")) != _squash(expected_title):
+        raise NdltdError(
+            f"取得的論文篇名「{d.fields.get('論文名稱', '')}」和預期的篇名不符。用 query＋index 讀取時，"
+            "fields、match、sort 必須和當時搜尋完全相同，否則序號會對到別篇論文。請核對後重試。"
+        )
+
+
+async def _load_detail(thesis_id: str, query: str, index: int, fields: str, match: str, sort: str = "",
+                       expected_title: str = ""):
     """Detail page by thesis id, or by (query, index) for rows the list shows without an id.
     Returns (Detail, thesis_id or None, provenance note or '')."""
-    thesis_id, query = (thesis_id or "").strip(), (query or "").strip()
+    thesis_id, query = (thesis_id or "").strip(), re.sub(r"\s+", " ", (query or "").strip())
     if thesis_id:
         if not parsers.THESIS_ID_RE.fullmatch(thesis_id):
             raise NdltdError(f"論文編號格式不符：{thesis_id!r}。請用 ndltd_search 取得（例如 099NCTU5507087）。")
-        return parsers.parse_detail(await get_client().detail_html(thesis_id)), thesis_id, ""
+        d = parsers.parse_detail(await get_client().detail_html(thesis_id))
+        _check_title(d, expected_title)
+        return d, thesis_id, ""
     if query and index >= 1:
         f, m, so = options.resolve_fields(fields), options.resolve_match(match), options.resolve_sort(sort)
         d = parsers.parse_detail(await get_client().record_html(query, index, fields=f, match=m, sort=so))
+        _check_title(d, expected_title)
         return d, None, f"依搜尋「{query}」第 {index} 筆取得，請核對篇名"
     raise NdltdError("請提供 thesis_id，或同時提供 query 與 index（>=1）。")
 
@@ -93,7 +111,8 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
             homophone 只試過一例（搜人名，結果與 exact 相同）。除非精準比對找不到，否則不要使用。
         sort: 排序，留空＝站方預設（相關度）。year_desc／year_asc（畢業學年度，要最新論文用 year_desc）、
             cited_desc（被引用）、views_desc（點閱）、downloads_desc、title_asc、author_asc、school_asc 等。
-            指定排序會多發一個請求。
+            指定排序會多發一個請求。**排序尚未在真實站台驗證**：實測指定 year_desc 時結果順序和預設相同，
+            疑似沒有生效；請自行檢查回傳的學年度是否真的依序排列，不要假設它有用。
     回傳總筆數，以及本頁每筆的篇名、研究生、指導教授、學校系所、學年度、論文編號。
     """
     query = (query or "").strip()
@@ -110,6 +129,8 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
         extra += f", sort=\"{sort}\""
     lines = [f"共 {res.total} 筆；第 {page} 頁（本頁 {len(res.rows)} 筆）｜{options.describe(f, m)}"
              + (f"｜排序：{sort}" if so else "")]
+    if so:
+        lines.append("注意：排序功能尚未驗證（實測曾有結果順序與預設相同的情況），請用下列結果的學年度自行確認是否真的有排序。")
     if m != options.MATCH_CODES["exact"]:
         lines.append(
             "注意：非精準比對的範圍可能非常廣（實測 fuzzy 搜「微積分」會回三十多萬筆、前幾筆是無關的論文），"
@@ -118,7 +139,8 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
     for r in res.rows:
         note = "" if r.thesis_id else (
             f"（列表無編號{'；全文公開日期 ' + r.fulltext_note if r.fulltext_note else ''}；"
-            f"讀摘要請用 ndltd_abstract(query=\"{query}\", index={r.index}{extra})）"
+            f"讀摘要請用 ndltd_abstract(query=\"{query}\", index={r.index}{extra}, "
+            f"expected_title=\"{r.title.replace(chr(34), chr(39))}\")）"
         )
         lines.append(
             f"{r.index}. {r.title}\n   研究生：{r.author}｜指導教授：{r.advisor}\n"
@@ -130,20 +152,21 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
 @_tool
 async def ndltd_abstract(thesis_id: str = "", query: str = "", index: int = 0,
                          fields: str = options.DEFAULT_FIELDS, match: str = options.DEFAULT_MATCH,
-                         sort: str = options.DEFAULT_SORT,
+                         sort: str = options.DEFAULT_SORT, expected_title: str = "",
                          include_toc: bool = False, include_references: bool = False) -> str:
     """讀取完整書目、中英文摘要與關鍵詞。兩種用法擇一：
 
     1. thesis_id：論文編號，例如 099NCTU5507087（由 ndltd_search 取得）。
     2. query + index：搜尋結果列表沒有論文編號的論文（全文延後公開者），用原本的搜尋詞與
-       ndltd_search 顯示的序號（例如 21）；fields、match、sort 要和當時搜尋時相同。會重新搜尋再取該筆，
-       回傳的篇名請與搜尋結果核對。
+       ndltd_search 顯示的序號（例如 21）；fields、match、sort 要和當時搜尋時相同。會重新搜尋再取該筆。
 
     Args:
+        expected_title: 建議一律帶上（ndltd_search 的提示已附上）。取得的篇名和它不符時會直接報錯，
+            避免漏帶 sort 等條件而讀到別篇論文。
         include_toc: 附上目次（同一頁，不多發請求；預設關閉）。
         include_references: 附上參考文獻（同一頁，清單可能很長；預設關閉）。
     """
-    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort)
+    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort, expected_title)
     return (f"（{note}）\n" if note else "") + parsers.format_detail(
         d, tid, include_toc=include_toc, include_references=include_references)
 
@@ -151,13 +174,14 @@ async def ndltd_abstract(thesis_id: str = "", query: str = "", index: int = 0,
 @_tool
 async def ndltd_cite(thesis_id: str = "", query: str = "", index: int = 0,
                      fields: str = options.DEFAULT_FIELDS, match: str = options.DEFAULT_MATCH,
-                     sort: str = options.DEFAULT_SORT, format: str = "apa") -> str:
+                     sort: str = options.DEFAULT_SORT, expected_title: str = "", format: str = "apa") -> str:
     """產生學位論文的引用。用法同 ndltd_abstract（thesis_id，或 query + index）。
 
     Args:
+        expected_title: 同 ndltd_abstract，用 query＋index 時建議帶上，篇名不符會報錯。
         format: apa（APA 7，中文格式；只支援中文姓名與篇名）、bibtex（@mastersthesis／@phdthesis）、ris（TY - THES）。
             BibTeX 與 RIS 可匯入 Zotero、Mendeley、EndNote。
     引用只用詳目頁已有的欄位，並以論文出版年（西元）為年份；請與原頁面核對。
     """
-    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort)
+    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort, expected_title)
     return cite.make(format, d, tid, note)

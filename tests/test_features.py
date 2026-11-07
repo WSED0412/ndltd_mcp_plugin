@@ -243,3 +243,82 @@ async def test_sort_tool_output_and_hints(monkeypatch):
     assert "不認得的排序" in await call("ndltd_search", query="微積分", sort="random")
     assert "請核對篇名" in await call("ndltd_abstract", query="微積分", index=3, sort="year_desc")
     assert any(p.get("sortby") == ["-yr"] for p in result_posts(site))
+
+
+# ---- review follow-ups: default sort, empty results, expected_title, one-line notes
+def test_resolve_sort_normalises_the_site_default_and_knows_downloads_asc():
+    assert options.resolve_sort("relevance") == "" and options.resolve_sort("-.rule3") == ""
+    assert options.resolve_sort("downloads_asc") == ".total_fulltext"
+
+
+async def test_explicit_default_sort_costs_no_extra_request():
+    site = SortingSite()
+    await make(site).search_html("微積分", sort=options.resolve_sort("relevance"))
+    assert result_posts(site) == []
+
+
+async def test_sort_equal_to_the_pages_current_sort_is_not_posted_again():
+    site = SortingSite()
+    await make(site).search_html("微積分", sort="-.rule3")  # the fixture page already shows this sort
+    assert result_posts(site) == []
+
+
+class EmptySite(FakeSite):
+    def __call__(self, req: httpx.Request) -> httpx.Response:
+        if req.method == "POST" and str(req.url).endswith("/search"):
+            self.log.append((req.method, str(req.url)))
+            return httpx.Response(200, text="<html><body>檢索結果共 0 筆資料</body></html>")
+        return super().__call__(req)
+
+
+async def test_zero_results_with_sort_or_paging_make_no_further_requests():
+    site = EmptySite()
+    html = await make(site).search_html("沒有這個詞", page=2, sort="-yr")
+    assert parsers.parse_search(html).total == 0
+    assert [u for m, u in site.log if "ccd=ABC999" in u] == ["https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/ccd=ABC999/search"]
+
+
+def test_result_total():
+    assert parsers.result_total("檢索結果共 <span>&nbsp;1,234&nbsp;</span>筆資料") == 1234
+    assert parsers.result_total("hello") is None
+
+
+async def test_expected_title_blocks_a_wrong_record(monkeypatch):
+    site = SortingSite()
+    monkeypatch.setattr(server, "_client", make(site))
+    bad = await call("ndltd_abstract", query="微積分", index=3, expected_title="完全不同的篇名")
+    assert "篇名不符" in bad and "sort" in bad
+    ok = await call("ndltd_abstract", query="微積分", index=3,
+                    expected_title="大一學生 微積分學習策略與微積分學習成效之研究")  # spacing differences are tolerated
+    assert "楊嘉勝" in ok and "篇名不符" not in ok
+    assert "篇名不符" in await call("ndltd_cite", query="微積分", index=3, expected_title="別篇", format="ris")
+    assert "篇名不符" in await call("ndltd_abstract", thesis_id="099NCTU5507087", expected_title="別篇")
+
+
+class NoIdSite(FakeSite):
+    def __call__(self, req: httpx.Request) -> httpx.Response:
+        if req.method == "POST" and str(req.url).endswith("/search"):
+            self.log.append((req.method, str(req.url)))
+            html = load("search_one_result.html").replace("099NCTU5507087", "xx").replace("dbid=", "nodb=")
+            html = html.replace("id%3D%22xx%22", "nothing")
+            return httpx.Response(200, text=html)
+        return super().__call__(req)
+
+
+async def test_search_hint_for_rows_without_id_carries_expected_title(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(NoIdSite()))
+    out = await call("ndltd_search", query="微積分")
+    assert 'ndltd_abstract(query="微積分", index=1, expected_title="大一學生微積分學習策略與微積分學習成效之研究")' in out
+
+
+async def test_provenance_note_is_one_line_even_if_the_query_has_newlines(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(SortingSite()))
+    out = await call("ndltd_cite", query="微積分\n學習  策略", index=3, format="ris")
+    ris_text = out[out.index("TY  - THES"):]
+    assert "N1  - 依搜尋「微積分 學習 策略」第 3 筆取得，請核對篇名" in ris_text
+    assert all(l[:5] in ("TY  -", "AU  -", "TI  -", "PY  -", "PB  -", "M3  -", "DB  -", "LA  -", "KW  -", "N1  -", "UR  -", "ER  -")
+               for l in ris_text.splitlines() if l.strip())
+
+
+def test_result_total_reads_the_real_pages():
+    assert parsers.result_total(load("search_one_result.html")) == 1

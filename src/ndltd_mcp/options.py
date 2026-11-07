@@ -30,7 +30,7 @@ SORT_CODES = {
     "year_desc": "-yr", "year_asc": "yr",                      # 畢業學年度
     "cited_desc": "-.total_bequote", "cited_asc": ".total_bequote",  # 被引用
     "views_desc": "-.total_record", "views_asc": ".total_record",    # 點閱
-    "downloads_desc": "-.total_fulltext",                      # 下載
+    "downloads_desc": "-.total_fulltext", "downloads_asc": ".total_fulltext",  # 下載
     "title_asc": "tic", "title_desc": "-tic",                  # 論文名稱
     "author_asc": "auc", "author_desc": "-auc",                # 研究生
     "school_asc": "sc", "school_desc": "-sc",                  # 校院名稱
@@ -82,4 +82,4 @@ def resolve_sort(spec: str) -> str:
     code = SORT_CODES.get(spec) or (spec if spec in SORT_CODES.values() else None)
     if code is None:
         raise NdltdError(f"不認得的排序 {spec!r}。可用：{', '.join(SORT_CODES)}；留空＝站方預設（相關度）。")
-    return code
+    return "" if code == SORT_CODES["relevance"] else code  # already the site's default: no extra request

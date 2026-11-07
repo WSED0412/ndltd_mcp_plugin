@@ -50,10 +50,13 @@ class SessionApi:
         data = [("qs0", query), *[("dcf", f) for f in fields], ("displayonerecdisable", "1"),
                 ("extrasearch", match), ("dbcode", "nclcdr"), ("_status_", "descrition_general")]
         resp = await self._session_request("POST", "/search", content=urlencode(data).encode(), headers=FORM)
+        if parsers.result_total(resp.text) == 0:  # nothing to sort or page: the result page has no such form
+            return resp.text
         if sort:  # the page's sort select submits the whole result form again with another sortby
             form = parsers.result_form_fields(resp.text)
-            form["sortby"] = sort
-            resp = await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
+            if form.get("sortby") != sort:  # already in that order: no extra request
+                form["sortby"] = sort
+                resp = await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
         if page > 1:
             form = parsers.result_form_fields(resp.text)  # replay the whole form, as a browser would
             form.update({"jmpage": str(page), "jumpfmt1page": "跳至"})
