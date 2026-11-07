@@ -89,7 +89,8 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
         fields: 搜尋欄位，逗號分隔：title（論文名稱）、author（研究生）、advisor（指導教授）、committee（口試委員）、
             keyword（關鍵詞）、abstract（摘要）、references（參考文獻），或 all。預設 title,keyword。
         match: 比對方式：exact（精準，預設）、fuzzy（模糊）、homophone（同音）、synonym（同義詞）。
-            非精準模式只驗證過 fuzzy，且它對常見詞會回極大量的無關結果；除非精準比對找不到，否則不建議使用。
+            非精準模式都不建議當預設：fuzzy 對常見詞回極大量無關結果；synonym 實測筆數多約五成且夾雜無關論文；
+            homophone 只試過一例（搜人名，結果與 exact 相同）。除非精準比對找不到，否則不要使用。
     回傳總筆數，以及本頁每筆的篇名、研究生、指導教授、學校系所、學年度、論文編號。
     """
     query = (query or "").strip()
