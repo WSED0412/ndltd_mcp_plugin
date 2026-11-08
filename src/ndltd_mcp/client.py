@@ -54,7 +54,8 @@ class SessionApi:
             return resp.text
         if sort:  # the page's sort select submits the whole result form again with another sortby
             form = parsers.result_form_fields(resp.text)
-            if form.get("sortby") != sort:  # already in that order: no extra request
+            # no sort control on the page (over 2000 hits) or already in that order: no extra request
+            if "sortby" in form and form["sortby"] != sort:
                 form["sortby"] = sort
                 resp = await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
         if page > 1:

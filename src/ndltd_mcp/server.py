@@ -111,8 +111,8 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
             homophone 只試過一例（搜人名，結果與 exact 相同）。除非精準比對找不到，否則不要使用。
         sort: 排序，留空＝站方預設（相關度）。year_desc／year_asc（畢業學年度，要最新論文用 year_desc）、
             cited_desc（被引用）、views_desc（點閱）、downloads_desc、title_asc、author_asc、school_asc 等。
-            指定排序會多發一個請求。**排序尚未在真實站台驗證**：實測指定 year_desc 時結果順序和預設相同，
-            疑似沒有生效；請自行檢查回傳的學年度是否真的依序排列，不要假設它有用。
+            指定排序會多發一個請求。**站方在結果超過 2000 筆時不提供排序**，這時結果維持預設順序，
+            輸出會明說「排序沒有套用」；請加更多關鍵詞或換欄位縮小範圍後再排序。
     回傳總筆數，以及本頁每筆的篇名、研究生、指導教授、學校系所、學年度、論文編號。
     """
     query = (query or "").strip()
@@ -121,7 +121,8 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
     if page < 1:
         raise NdltdError("page 必須 >= 1。")
     f, m, so = options.resolve_fields(fields), options.resolve_match(match), options.resolve_sort(sort)
-    res = parsers.parse_search(await get_client().search_html(query, page, fields=f, match=m, sort=so))
+    html = await get_client().search_html(query, page, fields=f, match=m, sort=so)
+    res = parsers.parse_search(html)
     extra = ""
     if (fields, match) != (options.DEFAULT_FIELDS, options.DEFAULT_MATCH):
         extra = f", fields=\"{fields}\", match=\"{match}\""
@@ -129,8 +130,11 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
         extra += f", sort=\"{sort}\""
     lines = [f"共 {res.total} 筆；第 {page} 頁（本頁 {len(res.rows)} 筆）｜{options.describe(f, m)}"
              + (f"｜排序：{sort}" if so else "")]
-    if so:
-        lines.append("注意：排序功能尚未驗證（實測曾有結果順序與預設相同的情況），請用下列結果的學年度自行確認是否真的有排序。")
+    if so and parsers.current_sort(html) != so:
+        lines.append(
+            f"注意：排序沒有套用，下列是站方預設順序。站方在結果超過 2000 筆時不提供排序（這次共 {res.total} 筆）；"
+            "請加更多關鍵詞或換搜尋欄位縮小範圍後再排序。"
+        )
     if m != options.MATCH_CODES["exact"]:
         lines.append(
             "注意：非精準比對的範圍可能非常廣（實測 fuzzy 搜「微積分」會回三十多萬筆、前幾筆是無關的論文），"

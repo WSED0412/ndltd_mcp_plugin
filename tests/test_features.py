@@ -322,3 +322,39 @@ async def test_provenance_note_is_one_line_even_if_the_query_has_newlines(monkey
 
 def test_result_total_reads_the_real_pages():
     assert parsers.result_total(load("search_one_result.html")) == 1
+
+
+# ---- sort is not offered over 2000 hits
+import re  # noqa: E402
+
+
+def test_current_sort_reads_the_selected_option():
+    assert parsers.current_sort(load("search_one_result.html")) == "-.rule3"
+    no_select = re.sub(r"<select name=sortby.*?</select>", "", load("search_one_result.html"), flags=re.S)
+    assert parsers.current_sort(no_select) is None
+
+
+class OverLimitSite(FakeSite):
+    """Result pages without the sort control, as the site serves them for more than 2000 hits."""
+
+    def __call__(self, req: httpx.Request) -> httpx.Response:
+        resp = super().__call__(req)
+        if req.method == "POST" and (str(req.url).endswith("/search") or str(req.url).endswith("/result")):
+            html = re.sub(r"<select name=sortby.*?</select>", "", resp.text, flags=re.S)
+            html = html.replace('<input type=hidden name="sortby"', '<input type=hidden name="x_sortby"')
+            return httpx.Response(200, text=html)
+        return resp
+
+
+async def test_over_limit_results_send_no_sort_request_and_say_so(monkeypatch):
+    site = OverLimitSite()
+    monkeypatch.setattr(server, "_client", make(site))
+    out = await call("ndltd_search", query="人工智慧", sort="year_desc")
+    assert "排序沒有套用" in out and "2000" in out
+    assert result_posts(site) == []  # nothing was posted to sort
+
+
+async def test_applied_sort_does_not_carry_the_warning(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(SortingSite()))
+    out = await call("ndltd_search", query="微積分", sort="year_desc")
+    assert "排序：year_desc" in out and "排序沒有套用" not in out

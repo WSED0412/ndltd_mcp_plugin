@@ -212,6 +212,16 @@ def format_detail(d: Detail, thesis_id: str | None = None, include_toc: bool = F
 
 
 
+def current_sort(html: str) -> str | None:
+    """The sortby value the result page shows as selected, or None when the page has no sort control at all
+    (the site offers none for result sets over 2000 hits: '超過排序上限 2000 筆')."""
+    sel = HTMLParser(html).css_first("select[name=sortby]")
+    if sel is None:
+        return None
+    opt = sel.css_first("option[selected]") or sel.css_first("option")
+    return (opt.attributes.get("value") or "") if opt else ""
+
+
 def result_total(html: str) -> int | None:
     """The total in '檢索結果共 N 筆', or None when the page does not say (not a result page)."""
     gap = r"(?:\s|&nbsp;|<[^>]*>)*"  # the real page puts the number inside a <span> between 共 and 筆
