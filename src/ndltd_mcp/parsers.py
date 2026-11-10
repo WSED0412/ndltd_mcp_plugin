@@ -10,6 +10,7 @@ from .errors import NdltdParseError
 
 NONE = "（無）"
 THESIS_ID_RE = re.compile(r"[0-9]{3}[A-Z0-9]{8,14}")
+_CJK_RE = re.compile(r"[\u3400-\u9fff]")
 HANDLE_RE = re.compile(r"hdl\.handle\.net/(11296/[0-9A-Za-z]+)")
 CCD_RE = re.compile(r"/ccd=([0-9A-Za-z._~-]+)(?:/|\?|$)")  # ids can contain . and _ (seen: Jy2D._)
 
@@ -330,8 +331,16 @@ def parse_preview(html: str) -> list[Detail]:
             cell = block.css_first("td.stdncl2") or block
             return _node_text(cell)
 
+        zh, en = text_of(blocks[1]), text_of(blocks[2])
+        notes: list[str] = []
+        # the five blocks are taken by position (measured on 10 records); if their content plainly does not fit,
+        # say so instead of silently presenting shifted text
+        if zh and not _CJK_RE.search(zh):
+            notes.append("匯出的中文摘要區塊不含中文，區塊對齊可疑，請與詳目頁核對")
+        if en and len(_CJK_RE.findall(en)) > len(re.findall(r"[A-Za-z]", en)):
+            notes.append("匯出的外文摘要區塊以中文為主，區塊對齊可疑，請與詳目頁核對")
         out.append(Detail(
-            fields=fields, handle=m.group(1) if m else None, abstract_zh=text_of(blocks[1]), abstract_en=text_of(blocks[2]),
+            fields=fields, handle=m.group(1) if m else None, abstract_zh=zh, abstract_en=en, notes=notes,
             toc=text_of(blocks[3]), references=text_of(blocks[4]),
         ))
     return out

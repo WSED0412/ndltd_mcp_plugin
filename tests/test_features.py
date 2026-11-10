@@ -503,3 +503,32 @@ def test_cell_and_short_note_helpers():
     assert server._short_fulltext("網際網路公開日期：20290609") == "；20290609公開"
     assert server._short_fulltext("本篇電子全文限研究生所屬學校校內系統及IP範圍內開放") == "；限校內"
     assert server._short_fulltext("") == ""
+
+
+# ---- review follow-ups: lookups out of range send nothing more; hints survive quotes and line breaks
+async def test_record_lookup_out_of_range_sends_no_record_request():
+    site = EmptySite()
+    with pytest.raises(NdltdError, match="沒有第 3 筆"):
+        await make(site).record_html("沒有這個詞", 3)
+    assert not any("/record?" in u for _, u in site.log)
+    site = FakeSite()
+    site.total = 5
+    with pytest.raises(NdltdError, match="共 5 筆，沒有第 10 筆"):
+        await make(site).record_html("微積分", 10)
+    with pytest.raises(NdltdError):
+        await make(site).record_html("微積分", 0)
+    assert not any("/record?" in u for _, u in site.log)
+
+
+async def test_hint_quotes_and_flattens_the_query_and_title(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(NoIdSite()))
+    out = await call("ndltd_search", query='微積分 "學習\n策略"')
+    assert 'ndltd_abstract／ndltd_cite(query="微積分 \\"學習 策略\\"", index=<序號>' in out
+    out = await call("ndltd_search", query="微積分", compact=False)
+    assert 'expected_title="大一學生微積分學習策略與微積分學習成效之研究"' in out
+
+
+async def test_title_mismatch_message_mentions_per_page(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(SortingSite()))
+    out = await call("ndltd_abstract", query="微積分", index=3, expected_title="別篇")
+    assert "fields、match、sort、per_page" in out

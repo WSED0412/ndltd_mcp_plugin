@@ -96,7 +96,10 @@ class SessionApi:
         search is repeated right before the lookup, and the page that holds `index` is opened first. The page
         size is read from the page itself (it differs between guests and members), not assumed."""
         resp = await self._search(query, fields, match, sort, per_page)
-        if parsers.result_total(resp.text) != 0:
+        total = parsers.result_total(resp.text)
+        if index < 1 or (total is not None and index > total):
+            raise NdltdError(f"搜尋「{query}」共 {total if total is not None else '?'} 筆，沒有第 {index} 筆。")
+        if total != 0:
             size = int(parsers.result_form_fields(resp.text).get("jpsize") or PAGE_SIZE)
             page = (index - 1) // size + 1
             if page > 1:
@@ -127,9 +130,12 @@ class ExportMixin:
         first, last = rows[0].index, rows[-1].index
 
         async def checker(arg: str) -> int | None:
-            page_ = await self._session_request("GET", f"/getchecker?{arg}&cache={int(time.time() * 1000)}")
+            # no cache=<ms> parameter (robots.txt disallows URLs containing it); the browser side fetches with
+            # cache: "no-store", so identical getchecker URLs are never answered from the HTTP cache
+            page_ = await self._session_request("GET", f"/getchecker?{arg}")
             return parsers.checker_count(page_.text)
 
+        stopped = False
         try:
             if await checker(f"out=1-{max(res.total, last)}") != 0:
                 raise ExportError("清除既有勾選後，站方回報的勾選數不是 0；為避免匯出到不相干的紀錄，已中止。")
@@ -137,11 +143,15 @@ class ExportMixin:
                 raise ExportError(f"勾選後站方回報的筆數與預期的 {len(rows)} 筆不符；已中止。")
             preview = await self._session_request("GET", "/previewsave?preview=1&crange=1&cfield=2&outfmt=htm")
             records = parsers.parse_preview(preview.text)
+        except (NdltdBlockedError, NdltdCaptchaRequired, NdltdNetworkError):
+            stopped = True  # the site refuses us or is unreachable: stop, send nothing more (not even the cleanup)
+            raise
         finally:
-            try:
-                await checker(f"out=1-{max(res.total, last)}")  # leave the member's session as we found it
-            except NdltdError:
-                pass
+            if not stopped:
+                try:
+                    await checker(f"out=1-{max(res.total, last)}")  # leave the member's session as we found it
+                except NdltdError:
+                    pass
         if len(records) != len(rows):
             raise ExportError(f"預覽回傳 {len(records)} 筆，預期 {len(rows)} 筆；已中止，請不要採信這次的輸出。")
         return res, list(zip(rows, records))

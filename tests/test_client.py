@@ -49,8 +49,13 @@ async def test_local_server_wrong_token_and_timeout():
 class FakeSite:
     """Minimal stand-in: first hit gives captcha (or blank), then a session, search, detail."""
 
+    total = 500  # the one-result fixture page, reporting a big result set so lookups by index are in range
+
     def __init__(self, mode="ok"):
         self.mode, self.log, self.answer, self.bodies = mode, [], None, []
+
+    def page(self) -> str:
+        return load("search_one_result.html").replace("&nbsp;1&nbsp;", f"&nbsp;{self.total}&nbsp;", 1)
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         u = str(req.url)
@@ -78,9 +83,9 @@ class FakeSite:
             return httpx.Response(200, text=load("detail_099NCTU5507087.html"))
         if req.method == "POST" and u.endswith("/result"):
             self.result_body = req.content.decode()
-            return httpx.Response(200, text=load("search_one_result.html"))
+            return httpx.Response(200, text=self.page())
         if u.endswith("/search"):
-            return httpx.Response(200, text=load("search_one_result.html"))
+            return httpx.Response(200, text=self.page())
         return httpx.Response(404)
 
 
@@ -102,7 +107,7 @@ async def test_blank_page_raises_and_does_not_retry():
 async def test_search_reuses_session():
     site = FakeSite()
     c = make(site)
-    assert parsers.parse_search(await c.search_html("微積分")).total == 1
+    assert parsers.parse_search(await c.search_html("微積分")).total == 500
     await c.search_html("微積分")
     assert sum("o=dwebmge" in u for _, u in site.log) == 1
     assert all("/ccd=ABC999/" in u for _, u in site.log[2:])

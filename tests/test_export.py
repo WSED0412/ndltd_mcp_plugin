@@ -207,3 +207,81 @@ async def test_tool_validates_arguments(export_server):
     export_server._client = make(ExportSite())
     assert "max_records" in await tool(export_server, query="微積分", max_records=21, confirm=True)
     assert "query" in await tool(export_server, query=" ", confirm=True)
+
+
+# ---- review follow-ups: stop means stop, no cache= parameter, suspicious block alignment
+from test_client import BLANK  # noqa: E402
+
+
+class StopSite(ExportSite):
+    """The site refuses (blank page / captcha) when the preview is requested."""
+
+    def __init__(self, page_text, **kw):
+        super().__init__(**kw)
+        self.page_text = page_text
+
+    def __call__(self, req: httpx.Request) -> httpx.Response:
+        if "/previewsave?" in str(req.url):
+            self.log.append((req.method, str(req.url)))
+            return httpx.Response(200, text=self.page_text)
+        return super().__call__(req)
+
+
+async def test_blank_page_during_the_preview_stops_everything_including_the_cleanup():
+    from ndltd_mcp.errors import NdltdBlockedError
+
+    site = StopSite(BLANK)
+    with pytest.raises(NdltdBlockedError):
+        await make(site).export_full("微積分", 1, ("ti", "kw"), "es0", "", 20)
+    assert calls(site)[-1] == "/previewsave?preview=1&crange=1&cfield=2&outfmt=htm"  # nothing sent afterwards
+
+
+async def test_blank_page_during_the_selection_stops_everything_too():
+    from ndltd_mcp.errors import NdltdBlockedError
+
+    class BlankOnTick(ExportSite):
+        def __call__(self, req):
+            if "/getchecker?in=" in str(req.url):
+                self.log.append((req.method, str(req.url)))
+                return httpx.Response(200, text=BLANK)
+            return super().__call__(req)
+
+    site = BlankOnTick()
+    with pytest.raises(NdltdBlockedError):
+        await make(site).export_full("微積分", 1, ("ti", "kw"), "es0", "", 20)
+    assert calls(site)[-1] == "/getchecker?in=1-5"  # no cleanup request after the refusal
+
+
+async def test_a_parse_error_still_cleans_up_because_the_site_answered_normally():
+    site = StopSite("<html><body><b>第 1 筆</b></body></html>")  # an answer, just not what we expect
+    with pytest.raises(NdltdParseError):
+        await make(site).export_full("微積分", 1, ("ti", "kw"), "es0", "", 20)
+    assert calls(site)[-1] == "/getchecker?out=1-185"
+    assert site.ticked == 0
+
+
+async def test_export_requests_carry_no_cache_parameter():
+    site = ExportSite()
+    await make(site).export_full("微積分", 1, ("ti", "kw"), "es0", "", 20)
+    assert not any("cache=" in u for _, u in site.log)
+
+
+def test_parse_preview_warns_when_the_blocks_plainly_do_not_fit():
+    page = preview_page(TITLES[:1])
+    # simulate a shift: the Chinese-abstract slot holds English text, the English slot holds Chinese
+    shifted = page.replace("第1篇的中文摘要。\n第二行", "English only text").replace("English abstract 1", "這是中文")
+    rec = parsers.parse_preview(shifted)[0]
+    assert any("中文摘要區塊不含中文" in n for n in rec.notes) and any("外文摘要區塊以中文為主" in n for n in rec.notes)
+    assert parsers.parse_preview(page)[0].notes == []
+
+
+async def test_tool_output_shows_the_alignment_note(export_server):
+    site = ExportSite(preview_titles=None)
+    site.__class__ = type("Shifted", (ExportSite,), {
+        "__call__": lambda self, req: (
+            httpx.Response(200, text=preview_page(TITLES[: self.ticked]).replace("第1篇的中文摘要。\n第二行", "English only"))
+            if "/previewsave?" in str(req.url) and not self.log.append((req.method, str(req.url))) else ExportSite.__call__(self, req)),
+    })
+    export_server._client = make(site)
+    out = await tool(export_server, query="微積分", max_records=1, confirm=True)
+    assert "區塊對齊可疑" in out

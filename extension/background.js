@@ -37,7 +37,8 @@ async function pageJob(job) {
     const captcha = ((document.body && document.body.innerText) || "").includes("驗證碼檢查機制");
     return { ok: false, kind: captcha ? "captcha" : "nosession" };
   }
-  const init = { method: job.method, credentials: "include", headers: {} };
+  // no-store: identical URLs (e.g. the getchecker calls) must always reach the site, never the HTTP cache
+  const init = { method: job.method, credentials: "include", cache: "no-store", headers: {} };
   if (job.body != null) {
     init.body = job.body;
     init.headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -89,7 +90,9 @@ async function runJob(job) {
     const out = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pageJob, args: [job] });
     res = out && out[0] && out[0].result;
   } catch (e) {
-    res = { ok: false, kind: "nosession", error: String(e) };
+    // the injection itself failed (tab navigating, discarded, ...): that says nothing about the session, so report it
+    // as an error and leave the tab alone instead of sending the human back to the home page
+    res = { ok: false, kind: "script_error", error: String(e) };
   }
   if (!res) res = { ok: false, kind: "nosession", error: "no result from page" };
   if (res.ok) lastTabId = tab.id;

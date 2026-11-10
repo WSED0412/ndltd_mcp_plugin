@@ -27,7 +27,7 @@ def text(res):
 
 async def test_search_output(fake):
     out = text(await call("ndltd_search", query="微積分"))
-    assert "共 1 筆" in out and "099NCTU5507087" in out and "楊嘉勝" in out
+    assert "共 500 筆" in out and "099NCTU5507087" in out and "楊嘉勝" in out
 
 
 async def test_abstract_by_id(fake):

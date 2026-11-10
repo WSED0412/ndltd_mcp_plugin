@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import os
 import re
@@ -73,7 +74,7 @@ def _check_title(d, expected_title: str) -> None:
     if expected_title and _squash(d.fields.get("論文名稱", "")) != _squash(expected_title):
         raise NdltdError(
             f"取得的論文篇名「{d.fields.get('論文名稱', '')}」和預期的篇名不符。用 query＋index 讀取時，"
-            "fields、match、sort 必須和當時搜尋完全相同，否則序號會對到別篇論文。請核對後重試。"
+            "fields、match、sort、per_page 必須和當時搜尋完全相同，否則序號會對到別篇論文。請核對後重試。"
         )
 
 
@@ -104,6 +105,11 @@ def _size_note(requested: int, actual: int | None, total: int) -> str:
     if actual == requested:
         return f"｜每頁 {requested} 筆"
     return f"｜每頁 {actual if actual else '?'} 筆（你要求 {requested}，但站方沒有套用）"
+
+
+def _lit(s: str) -> str:
+    """A string as a quoted literal for the example calls in hints: one line, quotes escaped."""
+    return json.dumps(re.sub(r"\s+", " ", s or "").strip(), ensure_ascii=False)
 
 
 def _cell(v) -> str:
@@ -138,7 +144,7 @@ def _compact_rows(rows, query: str, extra: str) -> list[str]:
         ]))
     if missing:
         out.append(
-            f"標示「（無編號…）」的沒有論文編號；讀摘要或引用請用 ndltd_abstract／ndltd_cite(query=\"{query}\", "
+            f"標示「（無編號…）」的沒有論文編號；讀摘要或引用請用 ndltd_abstract／ndltd_cite(query={_lit(query)}, "
             f"index=<序號>{extra}, expected_title=<該筆的篇名>)。"
         )
     return out
@@ -149,11 +155,11 @@ def _long_rows(rows, query: str, extra: str) -> list[str]:
     for r in rows:
         note = "" if r.thesis_id else (
             f"（列表無編號{'；全文公開日期 ' + r.fulltext_note if r.fulltext_note else ''}；"
-            f"讀摘要請用 ndltd_abstract(query=\"{query}\", index={r.index}{extra}, "
-            f"expected_title=\"{r.title.replace(chr(34), chr(39))}\")）"
+            f"讀摘要請用 ndltd_abstract(query={_lit(query)}, index={r.index}{extra}, "
+            f"expected_title={_lit(r.title)})）"
         )
         out.append(
-            f"{r.index}. {r.title}\n   研究生：{r.author}｜指導教授：{r.advisor}\n"
+            f"{r.index}. {_cell(r.title)}\n   研究生：{r.author}｜指導教授：{r.advisor}\n"
             f"   {r.school}／{r.department}／{r.year} 學年度／{r.degree}\n"
             f"   學門：{r.field or parsers.NONE}／{r.category or parsers.NONE}｜論文種類：{r.kind or parsers.NONE}\n"
             f"   被引用：{_cell(r.cited) or '?'}｜點閱：{_cell(r.views) or '?'}｜下載：{_cell(r.downloads) or '?'}"
@@ -273,7 +279,7 @@ if EXPERIMENTAL_EXPORT:
         （選填目次、參考文獻），比逐篇呼叫 ndltd_abstract 省請求。
 
         會使用你的會員登入狀態；使用規範我們沒讀到，大量匯出是否允許不確定，請自行承擔風險、節制使用。
-        只在使用者明確要求時呼叫，不要自行批次翻頁。每次呼叫約 5 個請求（搜尋、清除勾選、勾選本頁、預覽、清除勾選）。
+        只在使用者明確要求時呼叫，不要自行批次翻頁。每次呼叫約 5 個請求（搜尋、清除勾選、勾選本頁、預覽、清除勾選）；指定 sort／per_page 或 page>1 時最多再多 2 個。
 
         Args:
             query, page, fields, match, sort: 同 ndltd_search（取該頁結果）。
