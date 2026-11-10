@@ -55,6 +55,13 @@ class SearchRow:
     advisor: str
     thesis_id: str | None  # None when the list shows no id (e.g. embargoed full text)
     fulltext_note: str = ""
+    field: str = ""  # 學門
+    category: str = ""  # 學類
+    kind: str = ""  # 論文種類
+    cited: int | None = None  # 被引用
+    views: int | None = None  # 點閱
+    downloads: int | None = None  # 下載
+    favorites: int | None = None  # 書目收藏
 
 
 @dataclass
@@ -69,6 +76,11 @@ def _after_label(lines: list[str], label: str) -> str:
         if m:
             return m.group(1).strip()
     return ""
+
+
+def _count(text: str, label: str) -> int | None:
+    m = re.search(rf"{label}\s*[:：]\s*(\d[\d,]*)", text)
+    return int(m.group(1).replace(",", "")) if m else None
 
 
 def _row_thesis_id(td: Node) -> str | None:
@@ -99,11 +111,15 @@ def parse_search(html: str) -> SearchPage:
         advisor = _after_label(lines, "指導教授")
         num = td.parent.css_first("td.tdfmt1-second") if td.parent else None
         idx = int(re.sub(r"\D", "", num.text()) or 0) if num else 0
-        ft = re.search(r"電子全文\s*\(([^)]*)\)", td.text())
+        row_text = td.text()
+        ft = re.search(r"電子全文\s*\(([^)]*)\)", row_text)
         page.rows.append(SearchRow(
             index=idx, title=_clean(link.text()), school=parts[0], department=parts[1], year=parts[2],
             degree=parts[3], author=author, advisor=advisor, thesis_id=_row_thesis_id(td),
             fulltext_note=ft.group(1) if ft else "",
+            field=parts[4], category=parts[5], kind=_after_label(lines, "論文種類"),
+            cited=_count(row_text, "被引用"), views=_count(row_text, "點閱"),
+            downloads=_count(row_text, "下載"), favorites=_count(row_text, "書目收藏"),
         ))
     return page
 

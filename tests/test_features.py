@@ -104,9 +104,11 @@ async def call(name, **kw):
     from mcp.server.mcpserver.exceptions import ToolError
 
     try:
-        return str(await server.mcp.call_tool(name, kw))
+        res = await server.mcp.call_tool(name, kw)
     except ToolError as e:
         return str(e)
+    content = getattr(res, "content", None)
+    return content[0].text if content else str(res)  # the real text, so tests can look at lines
 
 
 async def test_search_sends_chosen_fields_and_match(fake):
@@ -296,8 +298,10 @@ async def test_expected_title_blocks_a_wrong_record(monkeypatch):
 
 
 class NoIdSite(FakeSite):
+    """Like the guest list for embargoed theses: the rows carry no thesis id (search and result pages alike)."""
+
     def __call__(self, req: httpx.Request) -> httpx.Response:
-        if req.method == "POST" and str(req.url).endswith("/search"):
+        if req.method == "POST" and (str(req.url).endswith("/search") or str(req.url).endswith("/result")):
             self.log.append((req.method, str(req.url)))
             html = load("search_one_result.html").replace("099NCTU5507087", "xx").replace("dbid=", "nodb=")
             html = html.replace("id%3D%22xx%22", "nothing")
@@ -307,7 +311,7 @@ class NoIdSite(FakeSite):
 
 async def test_search_hint_for_rows_without_id_carries_expected_title(monkeypatch):
     monkeypatch.setattr(server, "_client", make(NoIdSite()))
-    out = await call("ndltd_search", query="微積分")
+    out = await call("ndltd_search", query="微積分", compact=False)
     assert 'ndltd_abstract(query="微積分", index=1, expected_title="大一學生微積分學習策略與微積分學習成效之研究")' in out
 
 
@@ -463,3 +467,39 @@ async def test_header_tells_the_truth_when_the_site_ignored_the_page_size(monkey
 async def test_no_size_note_for_an_empty_result(monkeypatch):
     monkeypatch.setattr(server, "_client", make(EmptySite()))
     assert "每頁" not in await call("ndltd_search", query="沒有這個詞", per_page=50)
+
+
+# ---- compact output (the default) and the extra columns
+async def test_compact_is_the_default_one_line_per_row_with_a_legend(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(SortingSite()))
+    out = await call("ndltd_search", query="微積分")
+    lines = out.splitlines()
+    assert lines[1].startswith("欄位：序號｜篇名｜研究生｜指導教授｜學校 系所 學年度 學位｜學門／學類｜被引用/點閱/下載/收藏｜論文編號")
+    assert lines[2] == ("1｜大一學生微積分學習策略與微積分學習成效之研究｜楊嘉勝｜白啟光｜國立交通大學 應用數學系所 99 碩士｜"
+                        "數學及統計學門／數學學類｜15/1062/197/1｜099NCTU5507087")
+    assert len(lines) == 3  # header, legend, one row: no footer when every row has an id
+
+
+async def test_compact_writes_the_no_id_hint_once_and_marks_the_rows(monkeypatch):
+    site = NoIdSite()
+    monkeypatch.setattr(server, "_client", make(site))
+    out = await call("ndltd_search", query="微積分", sort="year_desc", per_page=20)
+    row = [l for l in out.splitlines() if l.startswith("1｜")][0]
+    assert row.endswith("｜（無編號）")
+    assert out.count("expected_title=<該筆的篇名>") == 1
+    assert 'ndltd_abstract／ndltd_cite(query="微積分", index=<序號>, sort="year_desc", per_page=20, expected_title=' in out
+
+
+async def test_long_format_is_still_available_and_has_the_new_fields(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(SortingSite()))
+    out = await call("ndltd_search", query="微積分", compact=False)
+    assert "學門：數學及統計學門／數學學類｜論文種類：學術論文" in out
+    assert "被引用：15｜點閱：1062｜下載：197｜書目收藏：1" in out
+    assert "欄位：序號" not in out
+
+
+def test_cell_and_short_note_helpers():
+    assert server._cell("a｜b\n  c") == "a/b c" and server._cell(None) == "" and server._cell(0) == "0"
+    assert server._short_fulltext("網際網路公開日期：20290609") == "；20290609公開"
+    assert server._short_fulltext("本篇電子全文限研究生所屬學校校內系統及IP範圍內開放") == "；限校內"
+    assert server._short_fulltext("") == ""

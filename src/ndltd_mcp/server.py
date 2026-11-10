@@ -106,10 +106,66 @@ def _size_note(requested: int, actual: int | None, total: int) -> str:
     return f"｜每頁 {actual if actual else '?'} 筆（你要求 {requested}，但站方沒有套用）"
 
 
+def _cell(v) -> str:
+    """One table cell of the compact format: no separators or line breaks inside."""
+    return re.sub(r"\s+", " ", str(v if v not in (None, "") else "")).replace("｜", "/").strip()
+
+
+def _short_fulltext(note: str) -> str:
+    m = re.search(r"(\d{8})", note or "")
+    if m:
+        return f"；{m.group(1)}公開"
+    return "；限校內" if "校內" in (note or "") else ""
+
+
+def _stats(r) -> str:
+    return "/".join("?" if x is None else str(x) for x in (r.cited, r.views, r.downloads, r.favorites))
+
+
+def _compact_rows(rows, query: str, extra: str) -> list[str]:
+    out = ["欄位：序號｜篇名｜研究生｜指導教授｜學校 系所 學年度 學位｜學門／學類｜被引用/點閱/下載/收藏｜論文編號"]
+    missing = False
+    for r in rows:
+        if r.thesis_id:
+            ident = r.thesis_id
+        else:
+            missing = True
+            ident = f"（無編號{_short_fulltext(r.fulltext_note)}）"
+        out.append("｜".join([
+            str(r.index), _cell(r.title), _cell(r.author), _cell(r.advisor),
+            _cell(f"{r.school} {r.department} {r.year} {r.degree}"),
+            _cell(f"{r.field}／{r.category}" if r.field or r.category else ""), _stats(r), ident,
+        ]))
+    if missing:
+        out.append(
+            f"標示「（無編號…）」的沒有論文編號；讀摘要或引用請用 ndltd_abstract／ndltd_cite(query=\"{query}\", "
+            f"index=<序號>{extra}, expected_title=<該筆的篇名>)。"
+        )
+    return out
+
+
+def _long_rows(rows, query: str, extra: str) -> list[str]:
+    out = []
+    for r in rows:
+        note = "" if r.thesis_id else (
+            f"（列表無編號{'；全文公開日期 ' + r.fulltext_note if r.fulltext_note else ''}；"
+            f"讀摘要請用 ndltd_abstract(query=\"{query}\", index={r.index}{extra}, "
+            f"expected_title=\"{r.title.replace(chr(34), chr(39))}\")）"
+        )
+        out.append(
+            f"{r.index}. {r.title}\n   研究生：{r.author}｜指導教授：{r.advisor}\n"
+            f"   {r.school}／{r.department}／{r.year} 學年度／{r.degree}\n"
+            f"   學門：{r.field or parsers.NONE}／{r.category or parsers.NONE}｜論文種類：{r.kind or parsers.NONE}\n"
+            f"   被引用：{_cell(r.cited) or '?'}｜點閱：{_cell(r.views) or '?'}｜下載：{_cell(r.downloads) or '?'}"
+            f"｜書目收藏：{_cell(r.favorites) or '?'}\n   論文編號：{r.thesis_id or parsers.NONE}{note}"
+        )
+    return out
+
+
 @_tool
 async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_FIELDS,
                        match: str = options.DEFAULT_MATCH, sort: str = options.DEFAULT_SORT,
-                       per_page: int = options.DEFAULT_PER_PAGE) -> str:
+                       per_page: int = options.DEFAULT_PER_PAGE, compact: bool = True) -> str:
     """搜尋臺灣博碩士論文。多個詞以空白分隔。
 
     Args:
@@ -125,8 +181,10 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
             指定排序會多發一個請求。**站方在結果超過 2000 筆時不提供排序**，這時結果維持預設順序，
             輸出會明說「排序沒有套用」；請加更多關鍵詞或換欄位縮小範圍後再排序。
         per_page: 每頁筆數，10／20／30／50／100，0（預設）＝站方預設（訪客 20，登入會員曾見 10）。
-            改每頁筆數會多發一個請求（和 sort 合併成一個）；100 筆的輸出很長，請只在需要整批瀏覽時使用。
-    回傳總筆數，以及本頁每筆的篇名、研究生、指導教授、學校系所、學年度、論文編號。
+            改每頁筆數會多發一個請求（和 sort 合併成一個）。
+        compact: 預設 True，每筆一行（序號｜篇名｜研究生｜指導教授｜學校 系所 學年度 學位｜學門／學類｜
+            被引用/點閱/下載/收藏｜論文編號），沒有編號的提示只在最後寫一次。False 則每筆多行，較易讀但很長。
+    回傳總筆數，以及本頁每筆的書目與次數統計（同一頁的資料，不多發請求）。
     """
     query = (query or "").strip()
     if not query:
@@ -156,16 +214,7 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
             "注意：非精準比對的範圍可能非常廣（實測 fuzzy 搜「微積分」會回三十多萬筆、前幾筆是無關的論文），"
             "請對照精準比對的筆數，不要直接當作相關結果。"
         )
-    for r in res.rows:
-        note = "" if r.thesis_id else (
-            f"（列表無編號{'；全文公開日期 ' + r.fulltext_note if r.fulltext_note else ''}；"
-            f"讀摘要請用 ndltd_abstract(query=\"{query}\", index={r.index}{extra}, "
-            f"expected_title=\"{r.title.replace(chr(34), chr(39))}\")）"
-        )
-        lines.append(
-            f"{r.index}. {r.title}\n   研究生：{r.author}｜指導教授：{r.advisor}\n"
-            f"   {r.school}／{r.department}／{r.year} 學年度／{r.degree}\n   論文編號：{r.thesis_id or parsers.NONE}{note}"
-        )
+    lines += (_compact_rows if compact else _long_rows)(res.rows, query, extra)
     return "\n".join(lines)
 
 

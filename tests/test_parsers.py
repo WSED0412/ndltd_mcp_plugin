@@ -32,6 +32,8 @@ def test_search_one_result():
     assert (r.school, r.department, r.year, r.degree) == ("國立交通大學", "應用數學系所", "99", "碩士")
     assert r.author == "楊嘉勝" and r.advisor == "白啟光"
     assert r.thesis_id == "099NCTU5507087"
+    assert (r.field, r.category, r.kind) == ("數學及統計學門", "數學學類", "學術論文")
+    assert (r.cited, r.views, r.downloads, r.favorites) == (15, 1062, 197, 1)
 
 
 def test_search_row_without_id_and_embargo_note():
