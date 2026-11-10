@@ -97,6 +97,15 @@ async def _load_detail(thesis_id: str, query: str, index: int, fields: str, matc
     raise NdltdError("請提供 thesis_id，或同時提供 query 與 index（>=1）。")
 
 
+def _size_note(requested: int, actual: int | None, total: int) -> str:
+    """What the header says about the page size: the size the site really shows, and a warning when it ignored ours."""
+    if not requested or total == 0:
+        return ""
+    if actual == requested:
+        return f"｜每頁 {requested} 筆"
+    return f"｜每頁 {actual if actual else '?'} 筆（你要求 {requested}，但站方沒有套用）"
+
+
 @_tool
 async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_FIELDS,
                        match: str = options.DEFAULT_MATCH, sort: str = options.DEFAULT_SORT,
@@ -136,7 +145,7 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
     if pp:
         extra += f", per_page={pp}"
     lines = [f"共 {res.total} 筆；第 {page} 頁（本頁 {len(res.rows)} 筆）｜{options.describe(f, m)}"
-             + (f"｜排序：{sort}" if so else "") + (f"｜每頁 {pp} 筆" if pp else "")]
+             + (f"｜排序：{sort}" if so else "") + _size_note(pp, parsers.current_page_size(html), res.total)]
     if so and parsers.current_sort(html) != so:
         lines.append(
             f"注意：排序沒有套用，下列是站方預設順序。站方在結果超過 2000 筆時不提供排序（這次共 {res.total} 筆）；"

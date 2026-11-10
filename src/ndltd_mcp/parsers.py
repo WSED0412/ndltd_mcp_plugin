@@ -222,6 +222,18 @@ def current_sort(html: str) -> str | None:
     return (opt.attributes.get("value") or "") if opt else ""
 
 
+def current_page_size(html: str) -> int | None:
+    """The page size the result page shows as selected (the jpsize select), or None when it has no such control."""
+    sel = HTMLParser(html).css_first("select[name=jpsize]")
+    if sel is None:
+        return None
+    opt = sel.css_first("option[selected]") or sel.css_first("option")
+    try:
+        return int((opt.attributes.get("value") or "").strip()) if opt else None
+    except ValueError:
+        return None
+
+
 def result_total(html: str) -> int | None:
     """The total in '檢索結果共 N 筆', or None when the page does not say (not a result page)."""
     gap = r"(?:\s|&nbsp;|<[^>]*>)*"  # the real page puts the number inside a <span> between 共 and 筆

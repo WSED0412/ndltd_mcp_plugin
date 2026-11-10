@@ -435,7 +435,7 @@ async def test_per_page_in_the_tools(monkeypatch):
     site = PagedSite()
     monkeypatch.setattr(server, "_client", make(site))
     out = await call("ndltd_search", query="微積分", per_page=50)
-    assert "每頁 50 筆" in out
+    assert "每頁 50 筆" in out and "沒有套用" not in out
     assert "per_page 只能是" in await call("ndltd_search", query="微積分", per_page=7)
     assert "請核對篇名" in await call("ndltd_abstract", query="微積分", index=3, per_page=50)
     assert any(p.get("jpsize") == ["50"] for p in result_posts(site))
@@ -445,3 +445,21 @@ async def test_sort_alone_does_not_set_the_size_change_flag():
     site = PagedSite()
     await make(site).search_html("微積分", sort="-yr")
     assert result_posts(site)[0].get("SubmitChangePage") == [""]  # unchanged from the page: only the sort differs
+
+
+def test_current_page_size_reads_the_selected_option():
+    assert parsers.current_page_size(load("search_one_result.html")) == 20
+    assert parsers.current_page_size("<html><body>no select</body></html>") is None
+
+
+async def test_header_tells_the_truth_when_the_site_ignored_the_page_size(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(SortingSite()))  # this site never changes the page size
+    out = await call("ndltd_search", query="微積分", per_page=50)
+    assert "每頁 20 筆（你要求 50，但站方沒有套用）" in out
+    out = await call("ndltd_search", query="微積分")
+    assert "每頁" not in out.splitlines()[0]  # nothing requested, nothing claimed
+
+
+async def test_no_size_note_for_an_empty_result(monkeypatch):
+    monkeypatch.setattr(server, "_client", make(EmptySite()))
+    assert "每頁" not in await call("ndltd_search", query="沒有這個詞", per_page=50)
