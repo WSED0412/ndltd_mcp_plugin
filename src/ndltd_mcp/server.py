@@ -11,7 +11,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from . import cite, options, parsers
 from .bridge import BridgeClient
-from .client import NdltdClient
+from .client import MAX_EXPORT, NdltdClient
 from .errors import NdltdError
 
 mcp = MCPServer(
@@ -189,3 +189,52 @@ async def ndltd_cite(thesis_id: str = "", query: str = "", index: int = 0,
     """
     d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort, expected_title)
     return cite.make(format, d, tid, note)
+
+
+# ---------------------------------------------------------------------------------------------- experimental
+# Off by default: it only exists when NDLTD_EXPERIMENTAL_EXPORT=1 is set in the MCP server's environment.
+EXPERIMENTAL_EXPORT = os.environ.get("NDLTD_EXPERIMENTAL_EXPORT") == "1"
+
+if EXPERIMENTAL_EXPORT:
+
+    @_tool
+    async def ndltd_export_full(query: str, page: int = 1, max_records: int = 10, fields: str = options.DEFAULT_FIELDS,
+                                match: str = options.DEFAULT_MATCH, sort: str = options.DEFAULT_SORT,
+                                include_toc: bool = False, include_references: bool = False,
+                                confirm: bool = False) -> str:
+        """【實驗性，僅限已登入的國圖會員】用站方自己的「完整書目」匯出，一次取回一頁搜尋結果的書目＋中英文摘要
+        （選填目次、參考文獻），比逐篇呼叫 ndltd_abstract 省請求。
+
+        會使用你的會員登入狀態；使用規範我們沒讀到，大量匯出是否允許不確定，請自行承擔風險、節制使用。
+        只在使用者明確要求時呼叫，不要自行批次翻頁。每次呼叫約 5 個請求（搜尋、清除勾選、勾選本頁、預覽、清除勾選）。
+
+        Args:
+            query, page, fields, match, sort: 同 ndltd_search（取該頁結果）。
+            max_records: 本次最多取幾筆，1–20（也受該頁筆數限制）。
+            confirm: 必須明確傳 True，否則不會發出任何請求。
+        """
+        if not confirm:
+            return (
+                "未執行：這是實驗性的會員匯出功能，會使用使用者的會員登入狀態對站方發出約 5 個請求。"
+                "請先向使用者確認，再以 confirm=True 重新呼叫。"
+            )
+        query = (query or "").strip()
+        if not query:
+            raise NdltdError("query 不能是空的。")
+        if page < 1:
+            raise NdltdError("page 必須 >= 1。")
+        if not 1 <= max_records <= MAX_EXPORT:
+            raise NdltdError(f"max_records 必須介於 1 到 {MAX_EXPORT}。")
+        f, m, so = options.resolve_fields(fields), options.resolve_match(match), options.resolve_sort(sort)
+        res, pairs = await get_client().export_full(query, page, f, m, so, max_records)
+        lines = [f"（實驗性會員匯出）共 {res.total} 筆；第 {page} 頁；本次取得 {len(pairs)} 筆｜{options.describe(f, m)}"
+                 + (f"｜排序：{sort}" if so else "")]
+        for row, d in pairs:
+            if _squash(row.title) != _squash(d.fields.get("論文名稱", "")):
+                raise NdltdError(
+                    f"第 {row.index} 筆的匯出篇名「{d.fields.get('論文名稱', '')}」與搜尋結果的「{row.title}」不符；已中止，請不要採信。"
+                )
+            lines.append(f"\n==== 第 {row.index} 筆 ====\n" + parsers.format_detail(
+                d, row.thesis_id, include_toc=include_toc, include_references=include_references))
+        return "\n".join(lines)
+

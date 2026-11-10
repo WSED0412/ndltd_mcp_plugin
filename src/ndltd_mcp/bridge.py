@@ -23,7 +23,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import parsers
-from .client import MIN_INTERVAL, SessionApi
+from .client import MIN_INTERVAL, ExportMixin, SessionApi
 from .errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdNetworkError
 
 DEFAULT_PORT = 8765
@@ -190,7 +190,7 @@ class _Page:
         self.text = text
 
 
-class BridgeClient(SessionApi):
+class BridgeClient(ExportMixin, SessionApi):
     """Same high-level API as NdltdClient, but every request is made by the user's own Chrome."""
 
     def __init__(self, bridge: Bridge | None = None, min_interval: float = MIN_INTERVAL):

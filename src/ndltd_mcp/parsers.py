@@ -254,3 +254,56 @@ def result_form_fields(html: str) -> dict[str, str]:
             out[name] = i.attributes.get("value") or ""
         return out
     raise NdltdParseError("結果頁找不到換頁表單（action 以 /result 結尾）；頁面結構可能改版。")
+
+
+# ---------------------------------------------------------------- member-only full export (experimental)
+
+def has_full_export(html: str) -> bool:
+    """True when the result page offers the '完整書目' export (value 2) - the site shows it to logged-in members only."""
+    return HTMLParser(html).css_first('input[name="cfield"][value="2"]') is not None
+
+
+def checker_count(html: str) -> int | None:
+    """stenownum from a getchecker answer: how many records of this search are ticked."""
+    m = re.search(r'id="?stenownum"?[^>]*value="?(\d+)', html)
+    return int(m.group(1)) if m else None
+
+
+def parse_preview(html: str) -> list[Detail]:
+    """Records of the '完整書目' preview page (/previewsave). Each record starts at '<b>第 N 筆</b>' and is followed by
+    table.tableoutfmt2 blocks in a fixed order: bibliographic fields, 摘要, 外文摘要, 目次, 參考文獻, then
+    optional ones (full text, paper copy, school link). Measured live on 10 records: the first five are always there."""
+    tree = HTMLParser(html)
+    records: list[list[Node]] = []
+    for node in tree.css("b, table.tableoutfmt2"):
+        if node.tag == "b":
+            if re.fullmatch(r"第\s*\d+\s*筆", _clean(node.text())):
+                records.append([])
+        elif records:
+            records[-1].append(node)
+    out: list[Detail] = []
+    for blocks in records:
+        if len(blocks) < 5:
+            raise NdltdParseError(f"匯出預覽的某一筆只有 {len(blocks)} 個區塊（預期至少 5 個）；頁面結構可能改版。")
+        meta = blocks[0]
+        fields: dict[str, str] = {}
+        for th in meta.css("th.std1"):
+            label = _clean(th.text()).rstrip(":：").strip()
+            row = th.parent
+            td = row.css_first("td") if row is not None else None
+            if not label or td is None or label.startswith("本論文永久網址"):
+                continue
+            fields[label] = "、".join(x for x in (_clean(l) for l in _node_text(td).split("\n")) if x)
+        if "論文名稱" not in fields:
+            raise NdltdParseError("匯出預覽的某一筆找不到「論文名稱」；頁面結構可能改版。")
+        m = HANDLE_RE.search(meta.html or "")
+
+        def text_of(block: Node) -> str:
+            cell = block.css_first("td.stdncl2") or block
+            return _node_text(cell)
+
+        out.append(Detail(
+            fields=fields, handle=m.group(1) if m else None, abstract_zh=text_of(blocks[1]), abstract_en=text_of(blocks[2]),
+            toc=text_of(blocks[3]), references=text_of(blocks[4]),
+        ))
+    return out

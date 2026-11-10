@@ -16,7 +16,7 @@ import httpx
 
 from . import parsers
 from .captcha import CaptchaChallenge, HumanCaptchaServer, parse_captcha_page
-from .errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdNetworkError
+from .errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdError, NdltdNetworkError
 
 BASE = "https://ndltd.ncl.edu.tw"
 CGI = BASE + "/cgi-bin/gs32/gsweb.cgi"
@@ -77,7 +77,50 @@ class SessionApi:
         return (await self._session_request("GET", f"/record?r1={index}&h1=1")).text
 
 
-class NdltdClient(SessionApi):
+MAX_EXPORT = 20  # records per experimental export call
+
+
+class ExportError(NdltdError):
+    """The member-only export could not be done safely (not logged in, selection did not match, ...)."""
+
+
+class ExportMixin:
+    async def export_full(self, query: str, page: int, fields, match: str, sort: str, limit: int):
+        """EXPERIMENTAL, members only: the page's own '完整書目' export of one result page.
+        Requests: the search (plus sort / page jump), clear ticks, tick this page's rows, preview, clear ticks.
+        Ticks live in the session and survive new searches, so they are cleared first and last; the tick count
+        reported by the site is checked before the preview is fetched."""
+        html = await self.search_html(query, page, fields=fields, match=match, sort=sort)
+        res = parsers.parse_search(html)
+        if not res.rows:
+            return res, []
+        if not parsers.has_full_export(html):
+            raise ExportError("結果頁沒有「完整書目」匯出選項：這個功能只提供給已登入的國圖會員，請先在瀏覽器登入。")
+        rows = res.rows[: max(1, min(limit, MAX_EXPORT))]
+        first, last = rows[0].index, rows[-1].index
+
+        async def checker(arg: str) -> int | None:
+            page_ = await self._session_request("GET", f"/getchecker?{arg}&cache={int(time.time() * 1000)}")
+            return parsers.checker_count(page_.text)
+
+        try:
+            if await checker(f"out=1-{max(res.total, last)}") != 0:
+                raise ExportError("清除既有勾選後，站方回報的勾選數不是 0；為避免匯出到不相干的紀錄，已中止。")
+            if await checker(f"in={first}-{last}") != len(rows):
+                raise ExportError(f"勾選後站方回報的筆數與預期的 {len(rows)} 筆不符；已中止。")
+            preview = await self._session_request("GET", "/previewsave?preview=1&crange=1&cfield=2&outfmt=htm")
+            records = parsers.parse_preview(preview.text)
+        finally:
+            try:
+                await checker(f"out=1-{max(res.total, last)}")  # leave the member's session as we found it
+            except NdltdError:
+                pass
+        if len(records) != len(rows):
+            raise ExportError(f"預覽回傳 {len(records)} 筆，預期 {len(rows)} 筆；已中止，請不要採信這次的輸出。")
+        return res, list(zip(rows, records))
+
+
+class NdltdClient(ExportMixin, SessionApi):
     def __init__(self, *, solver: Solver = human_solver, min_interval: float = MIN_INTERVAL,
                  transport: httpx.AsyncBaseTransport | None = None):
         self._http = httpx.AsyncClient(headers=HEADERS, timeout=TIMEOUT, follow_redirects=True, transport=transport)
