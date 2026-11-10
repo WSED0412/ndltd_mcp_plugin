@@ -11,7 +11,7 @@ from .errors import NdltdParseError
 NONE = "（無）"
 THESIS_ID_RE = re.compile(r"[0-9]{3}[A-Z0-9]{8,14}")
 HANDLE_RE = re.compile(r"hdl\.handle\.net/(11296/[0-9A-Za-z]+)")
-CCD_RE = re.compile(r"/ccd=([0-9A-Za-z]+)(?:/|\?|$)")
+CCD_RE = re.compile(r"/ccd=([0-9A-Za-z._~-]+)(?:/|\?|$)")  # ids can contain . and _ (seen: Jy2D._)
 
 
 def page_kind(html: str) -> str:

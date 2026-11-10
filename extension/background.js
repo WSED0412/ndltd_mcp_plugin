@@ -32,7 +32,7 @@ function waitComplete(tabId, ms = 15000) {
 // site is untouched). Must be self-contained: it is serialized into the page. Runs a same-origin fetch under
 // the tab's own session (the ccd=XXXX path segment), exactly like the page's own forms. Never reads images.
 async function pageJob(job) {
-  const m = location.pathname.match(/^(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z]+)(?:\/|$)/);
+  const m = location.pathname.match(/^(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+)(?:\/|$)/);
   if (!m) {
     const captcha = ((document.body && document.body.innerText) || "").includes("驗證碼檢查機制");
     return { ok: false, kind: captcha ? "captcha" : "nosession" };
@@ -51,7 +51,7 @@ async function pageJob(job) {
   }
 }
 
-const SESSION_PATH = /\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z]+(\/|$)/;
+const SESSION_PATH = /\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+(\/|$)/;
 let lastTabId = null; // keep using the same tab for the chained requests of one operation
 
 function hasSession(tab) {

@@ -137,3 +137,8 @@ def test_detail_only_reads_the_record_tab_group():
     <div><table><tr><td class="stdncl2">right english</td></tr></table></div></div></div></body>"""
     d = parsers.parse_detail(html)
     assert d.abstract_zh == "對的中文摘要" and d.abstract_en == "right english"
+
+
+def test_find_ccd_accepts_dots_and_underscores():
+    assert parsers.find_ccd("/cgi-bin/gs32/gsweb.cgi/ccd=Jy2D._/search") == "Jy2D._"
+    assert parsers.find_ccd("https://x/cgi-bin/gs32/gsweb.cgi/ccd=a-b~c.d_e?x=1") == "a-b~c.d_e"
