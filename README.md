@@ -9,7 +9,8 @@
 | Tool | 用途 |
 |---|---|
 | `ndltd_search(query, page=1, fields="title,keyword", match="exact", sort="", per_page=0, compact=True)` | 搜尋。回傳總筆數＋本頁每筆的篇名、研究生、指導教授、學校系所、學年度、學位、學門／學類、被引用／點閱／下載／收藏次數、論文編號（次數與學門都在同一頁，不多發請求）。**預設用緊湊格式（`compact=True`）：每筆一行，欄位用「｜」分隔，開頭有欄位說明行，沒有論文編號的提示只在最後寫一次**；`compact=False` 則每筆多行，較易讀但很長。`fields`：`title`（論文名稱）、`author`（研究生）、`advisor`（指導教授）、`committee`（口試委員）、`keyword`、`abstract`、`references`，逗號分隔，或 `all`。`match`：`exact`（預設）、`fuzzy`、`homophone`、`synonym`。**非精準模式都不建議當預設**：`fuzzy` 對常見詞回極大量無關結果（實測「微積分」回三十多萬筆）；`synonym` 筆數多約五成且夾雜無關論文；`homophone` 只試過一例，與 `exact` 相同。輸出會附警告。`sort` 留空＝站方預設（相關度）；`year_desc`（要最新論文）、`year_asc`、`cited_desc`（被引用）、`views_desc`、`downloads_desc`、`title_asc`、`author_asc`、`school_asc` 等，指定排序會多發一個請求（`relevance` 等同預設，不多發）。**站方在結果超過 2000 筆時不提供排序**（頁面寫「超過排序上限 2000 筆」），這時結果維持預設順序，輸出會明說「排序沒有套用」；2000 筆以內實測有效。`per_page`：每頁筆數 10／20／30／50／100，0（預設）＝站方預設（訪客 20，登入會員曾見 10）；改變時和 `sort` 合併成同一個額外請求（實測：「微積分」`per_page=50`＋`year_desc` 一次送出得 50 筆、學年度 114…107 遞減、共 4 頁；換每頁筆數時頁面會把隱藏欄位 `SubmitChangePage` 設成 1，沒有它站方會忽略筆數；用 `ndltd_search` 本身實測也得 50 筆）。輸出標題的「每頁 N 筆」讀的是站方頁面實際選中的筆數，站方沒照辦時會寫「你要求 N，但站方沒有套用」。用 `query`＋`index` 讀摘要或引用時，`sort`、`per_page` 要和搜尋時相同。 |
-| `ndltd_abstract(thesis_id)` 或 `ndltd_abstract(query, index, fields, match, sort, per_page, expected_title)` | 完整書目＋中英文摘要＋關鍵詞，選填 `include_toc`（目次）、`include_references`（參考文獻），兩者來自同一頁、不多發請求。列表沒有論文編號的論文（全文延後公開者），用原搜尋詞與搜尋結果的序號讀取（`fields`、`match`、`sort` 要和當時相同）；建議帶 `expected_title`（搜尋結果的提示已附上），取得的篇名不符就報錯，避免序號對到別篇。 |
+| `ndltd_abstract(thesis_id)` 或 `ndltd_abstract(query, index, fields, match, sort, per_page, expected_title)` | 完整書目＋中英文摘要＋關鍵詞，選填 `include_toc`（目次）、`include_references`（參考文獻），兩者來自同一頁、不多發請求。列表沒有論文編號的論文（全文延後公開者），用原搜尋詞與搜尋結果的序號讀取（`fields`、`match`、`sort`、`per_page` 要和當時相同）；建議帶 `expected_title`（搜尋結果的提示已附上），取得的篇名不符就報錯，避免序號對到別篇。 |
+| `ndltd_export_full(query, …, confirm=True)` | **實驗性、預設不存在、僅限已登入的國圖會員**：一次取回一頁結果的書目＋中英文摘要。見下一節。 |
 | `ndltd_cite(thesis_id)` 或 `ndltd_cite(query, index, …, expected_title, format="apa")` | 學位論文引用：`apa`（APA 7，中文格式：`作者（年）。*篇名*〔碩士論文，校院〕。臺灣博碩士論文知識加值系統。網址`）、`bibtex`（`@mastersthesis`／`@phdthesis`）、`ris`（`TY - THES`），可匯入 Zotero、Mendeley、EndNote。年份用論文出版年（西元）。**APA 只支援中文姓名的作者**（外文姓名要轉成「姓, 名縮寫」，自動轉換容易出錯，這時請用 bibtex／ris）；篇名是英文沒關係；沒有永久網址時引用會省略網址。引用只用詳目頁已有的欄位，請與原頁面核對。 |
 
 ## 實驗性：會員匯出（預設關閉）
@@ -101,11 +102,29 @@ claude mcp add --scope user ndltd -- uv --directory "<專案資料夾完整路�
 
 不要重新整理、不要換 IP。先用瀏覽器手動確認自己能否進站；某個瀏覽器設定檔被擋時，可清除該網站的 cookie 與資料，或換另一個瀏覽器／設定檔。
 
+### 工具回報「橋接口無法使用」或「擴充功能沒有連上」時
+
+- **橋接口無法使用**：8765 埠被另一個程序占著，多半是前一次沒結束的 ndltd-mcp。程式刻意不和它共用埠（Windows 上共用會讓工作送到錯的程序）。結束舊的 `ndltd-mcp`（工作管理員或 `Get-Process`），再 `/mcp` 重新連線。
+- **擴充功能沒有連上**：確認 Chrome 開著、擴充功能已載入、選項頁的 token 和 `%USERPROFILE%\.ndltd_mcp\token` 相同、埠一致；改過擴充功能要重新載入。
+
 ## 狀態
 
-- 解析器、橋接口、客戶端、引用格式都有離線測試（假站台與假擴充功能）。
-- 2026-11-08 在真實 Chrome 驗證過：搜尋（含第 2 頁、依指導教授）、用論文編號讀摘要（含目次與參考文獻）、用「搜尋詞＋序號」讀沒有編號的論文、APA 引用。
-- 比對方式實測（2026-11-08）：`synonym` 搜「人工智慧」比 `exact` 多（11,057 對 7,190 筆），多出的有寺廟彩畫、胡笳十八拍之類無關論文，雜訊不少；`homophone` 搜指導教授「蔡炎龍」與 `exact` 完全相同（都是 65 筆），只試了這一例，看不出它何時會多收。所以非精準模式都不建議當預設。
-- RIS 與 BibTeX 用 `rispy`、`bibtexparser` 實際解析過（`tests/test_formats.py`，套件為開發依賴，未安裝時自動略過）；尚未實際匯入 Zotero／EndNote。
-- 未驗證：session 有效期；排序：「微積分」（185 筆）用 `year_desc` 實測有效（114、114、114、114、113…遞減，與瀏覽器自己的下拉選單一致）；結果超過 2000 筆時站方不提供排序（「人工智慧」7,190 筆曾因此沒有效果）。同一個查詢也實測過 `year_asc`（69、73、74、75… 遞增）、`title_asc`（數字、Latin 字母開頭先、依字元順序）、`school_asc`（同校聚在一起）、`author_asc`（Latin 在前，再依筆劃：丁、于、尤、文、方、王…）皆有效；`cited_desc`（被引用 28、23、19、15、14、14、14、14、11…）、`views_desc`（點閱 3510、1659、1489、1381、1165…）、`downloads_desc`（下載 697、545、379、324、278…）皆由大到小，`views_asc`（14、18、18、19、46、69…）遞增，`downloads_asc` 前 10 筆都是 0（與遞增一致，但全是並列，沒有更多資訊）；`relevance_asc`、`author_desc`、`title_desc`、`school_desc` 沒試過；純 HTTP 模式的驗證碼表單欄位（瀏覽器橋接模式不需要）。
-- `NDLTD_MODE=http` 可改用純 HTTP 客戶端，但目前站方會擋（空白頁）。
+**已在真實站台驗證（Chrome，2026-11）**
+
+- 搜尋：欄位選擇（例如依指導教授）、第 2 頁、`per_page`（50 筆）、緊湊格式與次數欄位。
+- 排序（「微積分」185 筆）：`year_desc`（114、114、114、114、113…）、`year_asc`（69、73、74、75…）、`title_asc`、`school_asc`、`author_asc`（Latin 在前，再依筆劃）、`cited_desc`（28、23、19、15、14…）、`views_desc`（3510、1659、1489…）、`downloads_desc`（697、545、379…）、`views_asc`（14、18、18、19、46…）皆有效；`downloads_asc` 前 10 筆都是 0，與遞增一致但全是並列。結果超過 2000 筆時站方不提供排序（「人工智慧」7,190 筆曾因此沒有效果），輸出會明說。
+- 摘要：用論文編號、用「搜尋詞＋序號」（沒有編號的論文）、含目次與參考文獻；APA 引用。
+- 會員匯出（需登入）：書目＋中英文摘要＋目次＋參考文獻都取回真實內容；勾選與清除、不帶 `cache=`、遇到停止的行為。
+- 比對方式：`synonym` 搜「人工智慧」比 `exact` 多（11,057 對 7,190 筆），多出的有寺廟彩畫、胡笳十八拍之類無關論文；`homophone` 搜指導教授「蔡炎龍」與 `exact` 相同（65 筆），只試了這一例。所以非精準模式都不建議當預設。
+- 橋接口：擴充功能長輪詢、驗證碼由使用者輸入、保活後閒置 10 分鐘的第一個請求約 5 秒。
+
+**離線測試**：114 個（假站台、假擴充功能、解析器、引用格式、橋接口安全檢查）。RIS／BibTeX 另用 `rispy`、`bibtexparser` 實際解析過（`tests/test_formats.py`，開發依賴，未安裝時自動略過）。
+
+**沒有驗證、或只有粗略觀察**
+
+- session 有效期沒有量過：同一個登入 session 撐過數小時，隔夜失效（粗略觀察）。失效時工具會請你重新輸入驗證碼。
+- RIS／BibTeX 沒有實際匯入 Zotero／EndNote。
+- `relevance_asc`、`author_desc`、`title_desc`、`school_desc` 沒試過。
+- 會員匯出：站方若在缺項（缺目次、缺外文摘要）時省略區塊，內容可能錯位；只有輕量偵測，沒有實測過這種論文。
+- Firefox：設定檔相容，但沒有完整驗證。
+- 純 HTTP 模式（`NDLTD_MODE=http`）：站方目前會擋（空白頁）；它的驗證碼表單欄位也沒有用真實頁面驗證過。瀏覽器橋接模式不需要這兩者。
