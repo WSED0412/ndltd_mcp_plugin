@@ -13,6 +13,41 @@
 | `ndltd_export_full(query, …, confirm=True)` | **實驗性、預設不存在、僅限已登入的國圖會員**：一次取回一頁結果的書目＋中英文摘要。見下一節。 |
 | `ndltd_cite(thesis_id)` 或 `ndltd_cite(query, index, …, expected_title, format="apa")` | 學位論文引用：`apa`（APA 7，中文格式：`作者（年）。*篇名*〔碩士論文，校院〕。臺灣博碩士論文知識加值系統。網址`）、`bibtex`（`@mastersthesis`／`@phdthesis`）、`ris`（`TY - THES`），可匯入 Zotero、Mendeley、EndNote。年份用論文出版年（西元）。**APA 只支援中文姓名的作者**（外文姓名要轉成「姓, 名縮寫」，自動轉換容易出錯，這時請用 bibtex／ris）；篇名是英文沒關係；沒有永久網址時引用會省略網址。引用只用詳目頁已有的欄位，請與原頁面核對。 |
 
+## 使用示範
+
+以下輸出是 2026-11 在真實站台取得的（節錄；書目資料來自國圖公開的檢索結果）。
+
+**搜尋，依被引用次數排序**：`ndltd_search(query="微積分", sort="cited_desc", per_page=20)`
+
+```
+共 185 筆；第 1 頁（本頁 20 筆）｜欄位：論文名稱、關鍵詞｜比對：exact｜排序：cited_desc｜每頁 20 筆
+欄位：序號｜篇名｜研究生｜指導教授｜學校 系所 學年度 學位｜學門／學類｜被引用/點閱/下載/收藏｜論文編號
+1｜台灣地區大學生微積分學習態度的研究｜黃冠仁｜陳福祥｜國立交通大學 應用數學系所 94 碩士｜數學及統計學門／數學學類｜28/1153/215/4｜（無編號）
+2｜自我效能、成就目標、考試焦慮、學習策略對數學學習成就的影響- 以中央大學微積分聯合教學為例｜謝書旻｜蕭嘉璋｜國立中央大學 數學系 102 碩士｜數學及統計學門／數學學類｜23/1381/545/1｜102NCU05479004
+…
+標示「（無編號…）」的沒有論文編號；讀摘要或引用請用 ndltd_abstract／ndltd_cite(query="微積分", index=<序號>, sort="cited_desc", per_page=20, expected_title=<該筆的篇名>)。
+```
+
+**讀沒有編號的那篇**：照提示帶上同樣的條件，並帶 `expected_title`，序號對不到同一篇就會報錯：
+
+```
+ndltd_abstract(query="微積分", index=1, sort="cited_desc", per_page=20, expected_title="台灣地區大學生微積分學習態度的研究")
+```
+
+**讀有編號的那篇，並附目次與參考文獻**：`ndltd_abstract(thesis_id="102NCU05479004", include_toc=True)`
+
+**引用**：`ndltd_cite(thesis_id="113NCCU5507018", format="apa")`
+
+```
+林佩昀（2025）。*ScoreRAG：基於檢索增強生成與一致性相關性評分的結構化新聞生成框架*〔碩士論文，國立政治大學〕。臺灣博碩士論文知識加值系統。https://hdl.handle.net/11296/967g89
+```
+
+`format` 也可以是 `bibtex` 或 `ris`，可匯入 Zotero、Mendeley、EndNote。
+
+**依指導教授找**：`ndltd_search(query="蔡炎龍", fields="advisor")`（實測 65 筆）。
+
+**結果太多時**：超過 2000 筆站方不提供排序，輸出會說明；先加關鍵詞或換欄位縮小範圍，再排序。
+
 ## 實驗性：會員匯出（預設關閉）
 
 `ndltd_export_full`：用站方自己的「完整書目」匯出，一次取回一頁搜尋結果的書目＋中英文摘要（選填目次、參考文獻）。
