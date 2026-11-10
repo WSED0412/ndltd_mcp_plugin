@@ -362,15 +362,18 @@ async def test_applied_sort_does_not_carry_the_warning(monkeypatch):
 
 # ---- per_page
 class PagedSite(SortingSite):
-    """Echoes the chosen page size like the real result page does (the selected option follows the posted jpsize)."""
+    """Echoes the chosen page size like the real result page does: the size only changes when the post carries
+    SubmitChangePage=1 (measured live: without that hidden field the site ignores jpsize)."""
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         resp = super().__call__(req)
         if req.method == "POST" and str(req.url).endswith("/result"):
-            size = parse_qs(req.content.decode(), keep_blank_values=True).get("jpsize", [""])[0]
-            html = resp.text.replace('<option value="20" selected>', '<option value="20">')
-            html = html.replace(f'<option value="{size}">', f'<option value="{size}" selected>')
-            return httpx.Response(200, text=html)
+            q = parse_qs(req.content.decode(), keep_blank_values=True)
+            size = q.get("jpsize", [""])[0]
+            if q.get("SubmitChangePage", [""])[0] == "1":
+                html = resp.text.replace('<option value="20" selected>', '<option value="20">')
+                html = html.replace(f'<option value="{size}">', f'<option value="{size}" selected>')
+                return httpx.Response(200, text=html)
         return resp
 
 
@@ -394,10 +397,12 @@ async def test_changing_the_page_size_is_one_extra_post_and_merges_with_sort():
     await make(site).search_html("微積分", per_page=50)
     posts = result_posts(site)
     assert len(posts) == 1 and posts[0]["jpsize"] == ["50"] and "jumpfmt1page" not in posts[0]
+    assert posts[0]["SubmitChangePage"] == ["1"]  # the field the real page sets when its size select changes
     site = PagedSite()
     await make(site).search_html("微積分", per_page=100, sort="-yr")
     posts = result_posts(site)
     assert len(posts) == 1 and posts[0]["jpsize"] == ["100"] and posts[0]["sortby"] == ["-yr"]  # one post, both changes
+    assert posts[0]["SubmitChangePage"] == ["1"]
 
 
 async def test_paging_with_a_new_size_keeps_the_size():
@@ -434,3 +439,9 @@ async def test_per_page_in_the_tools(monkeypatch):
     assert "per_page 只能是" in await call("ndltd_search", query="微積分", per_page=7)
     assert "請核對篇名" in await call("ndltd_abstract", query="微積分", index=3, per_page=50)
     assert any(p.get("jpsize") == ["50"] for p in result_posts(site))
+
+
+async def test_sort_alone_does_not_set_the_size_change_flag():
+    site = PagedSite()
+    await make(site).search_html("微積分", sort="-yr")
+    assert result_posts(site)[0].get("SubmitChangePage") == [""]  # unchanged from the page: only the sort differs

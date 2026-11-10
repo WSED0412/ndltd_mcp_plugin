@@ -62,6 +62,8 @@ class SessionApi:
             changes["sortby"] = sort
         if per_page and form.get("jpsize") != str(per_page):
             changes["jpsize"] = str(per_page)
+            changes["SubmitChangePage"] = "1"  # the page sets this hidden field when the size select changes; without
+            #                                    it the site ignores jpsize (measured live)
         if changes:
             form.update(changes)
             resp = await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
