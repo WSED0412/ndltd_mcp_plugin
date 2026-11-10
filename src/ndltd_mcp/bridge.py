@@ -52,6 +52,13 @@ def load_or_create_token() -> str:
     return tok
 
 
+class _Server(ThreadingHTTPServer):
+    # The stdlib default (allow_reuse_address = True) lets a second process bind the same port on Windows, so a stale
+    # server and a new one would listen side by side and the extension could end up talking to the wrong one.
+    allow_reuse_address = False
+    daemon_threads = True
+
+
 class _Handler(BaseHTTPRequestHandler):
     server_version = "ndltd-bridge"
     timeout = 30  # a stalled client cannot hold a handler thread forever
@@ -145,7 +152,7 @@ class Bridge:
         if self._httpd:
             return
         try:
-            self._httpd = ThreadingHTTPServer(("127.0.0.1", self.port), _Handler)
+            self._httpd = _Server(("127.0.0.1", self.port), _Handler)
         except OSError as e:
             raise NdltdNetworkError(
                 f"橋接口 127.0.0.1:{self.port} 無法使用（{e}）。可能已有另一個 ndltd-mcp 在執行；"

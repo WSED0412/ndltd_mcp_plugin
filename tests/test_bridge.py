@@ -164,3 +164,9 @@ def test_unauthorised_body_is_not_buffered_but_the_client_still_gets_its_403(bri
     assert data.startswith(b"HTTP/1.0 403") or data.startswith(b"HTTP/1.1 403") or data == b""
     # and the bridge is still healthy
     assert http_call(bridge, "GET", "/poll", headers={"X-Ndltd-Token": "wrong"})[0] == 403
+
+
+def test_a_second_bridge_on_the_same_port_fails_loudly(bridge):
+    other = Bridge(port=bridge.port, token="x")
+    with pytest.raises(NdltdNetworkError, match="橋接口"):
+        other.start()
