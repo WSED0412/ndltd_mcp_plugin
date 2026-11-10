@@ -358,3 +358,79 @@ async def test_applied_sort_does_not_carry_the_warning(monkeypatch):
     monkeypatch.setattr(server, "_client", make(SortingSite()))
     out = await call("ndltd_search", query="微積分", sort="year_desc")
     assert "排序：year_desc" in out and "排序沒有套用" not in out
+
+
+# ---- per_page
+class PagedSite(SortingSite):
+    """Echoes the chosen page size like the real result page does (the selected option follows the posted jpsize)."""
+
+    def __call__(self, req: httpx.Request) -> httpx.Response:
+        resp = super().__call__(req)
+        if req.method == "POST" and str(req.url).endswith("/result"):
+            size = parse_qs(req.content.decode(), keep_blank_values=True).get("jpsize", [""])[0]
+            html = resp.text.replace('<option value="20" selected>', '<option value="20">')
+            html = html.replace(f'<option value="{size}">', f'<option value="{size}" selected>')
+            return httpx.Response(200, text=html)
+        return resp
+
+
+def test_resolve_per_page():
+    assert options.resolve_per_page(0) == 0 and options.resolve_per_page(50) == 50
+    for bad in (7, 200, -1):
+        with pytest.raises(NdltdError, match="per_page"):
+            options.resolve_per_page(bad)
+
+
+async def test_default_page_size_costs_nothing_and_the_site_default_is_not_posted_again():
+    site = PagedSite()
+    await make(site).search_html("微積分")
+    assert result_posts(site) == []
+    await make(site).search_html("微積分", per_page=20)  # the fixture page already shows 20
+    assert result_posts(site) == []
+
+
+async def test_changing_the_page_size_is_one_extra_post_and_merges_with_sort():
+    site = PagedSite()
+    await make(site).search_html("微積分", per_page=50)
+    posts = result_posts(site)
+    assert len(posts) == 1 and posts[0]["jpsize"] == ["50"] and "jumpfmt1page" not in posts[0]
+    site = PagedSite()
+    await make(site).search_html("微積分", per_page=100, sort="-yr")
+    posts = result_posts(site)
+    assert len(posts) == 1 and posts[0]["jpsize"] == ["100"] and posts[0]["sortby"] == ["-yr"]  # one post, both changes
+
+
+async def test_paging_with_a_new_size_keeps_the_size():
+    site = PagedSite()
+    await make(site).search_html("微積分", page=3, per_page=50, sort="-yr")
+    posts = result_posts(site)
+    assert len(posts) == 2
+    assert posts[1]["jmpage"] == ["3"] and posts[1]["jpsize"] == ["50"] and posts[1]["sortby"] == ["-yr"]
+
+
+def jumps(site):
+    """Pages the client actually jumped to (a jump is the post that carries the 跳至 button)."""
+    return [p["jmpage"][0] for p in result_posts(site) if "jumpfmt1page" in p]
+
+
+async def test_record_lookup_uses_the_real_page_size_not_a_fixed_20():
+    site = PagedSite()
+    await make(site).record_html("微積分", 21)  # fixture page size 20 -> page 2
+    assert jumps(site) == ["2"]
+    site = PagedSite()
+    await make(site).record_html("微積分", 21, per_page=50)  # size 50 -> index 21 is on page 1: no jump
+    assert jumps(site) == [] and result_posts(site)[0]["jpsize"] == ["50"]
+    site = PagedSite()
+    await make(site).record_html("微積分", 120, per_page=50)  # 120 -> page 3 of 50
+    assert jumps(site) == ["3"]
+    assert site.log[-1][1].endswith("/record?r1=120&h1=1")
+
+
+async def test_per_page_in_the_tools(monkeypatch):
+    site = PagedSite()
+    monkeypatch.setattr(server, "_client", make(site))
+    out = await call("ndltd_search", query="微積分", per_page=50)
+    assert "每頁 50 筆" in out
+    assert "per_page 只能是" in await call("ndltd_search", query="微積分", per_page=7)
+    assert "請核對篇名" in await call("ndltd_abstract", query="微積分", index=3, per_page=50)
+    assert any(p.get("jpsize") == ["50"] for p in result_posts(site))

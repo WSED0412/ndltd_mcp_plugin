@@ -37,6 +37,9 @@ SORT_CODES = {
 }
 DEFAULT_SORT = ""
 
+PER_PAGE_VALUES = (10, 20, 30, 50, 100)  # the site's own choices; 0 = leave the site default
+DEFAULT_PER_PAGE = 0
+
 DEFAULT_FIELDS = "title,keyword"
 DEFAULT_MATCH = "exact"
 
@@ -83,3 +86,10 @@ def resolve_sort(spec: str) -> str:
     if code is None:
         raise NdltdError(f"不認得的排序 {spec!r}。可用：{', '.join(SORT_CODES)}；留空＝站方預設（相關度）。")
     return "" if code == SORT_CODES["relevance"] else code  # already the site's default: no extra request
+
+
+def resolve_per_page(n: int) -> int:
+    n = int(n or 0)
+    if n and n not in PER_PAGE_VALUES:
+        raise NdltdError(f"per_page 只能是 {', '.join(map(str, PER_PAGE_VALUES))}（0＝站方預設）。")
+    return n

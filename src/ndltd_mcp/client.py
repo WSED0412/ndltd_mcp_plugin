@@ -44,24 +44,43 @@ class SessionApi:
     """High-level operations on top of `_session_request(method, path, content=None, headers=None) -> .text`.
     Shared by the plain-HTTP client and the browser-bridge client."""
 
-    async def search_html(self, query: str, page: int = 1, fields: tuple[str, ...] = ("ti", "kw"),
-                          match: str = "es0", sort: str = "") -> str:
-        """Fresh search every call (result sets are per-session and get overwritten), then jump to `page`."""
+    async def _search(self, query: str, fields, match: str, sort: str, per_page: int):
+        """The search itself, then at most ONE more post of the result form to apply sort and/or page size (the
+        page's own select boxes submit the whole form again, so both are just fields of that one post).
+        Nothing extra is sent when the page already shows them, has no such control (over 2000 hits: no sort),
+        or has no results at all."""
         data = [("qs0", query), *[("dcf", f) for f in fields], ("displayonerecdisable", "1"),
                 ("extrasearch", match), ("dbcode", "nclcdr"), ("_status_", "descrition_general")]
         resp = await self._session_request("POST", "/search", content=urlencode(data).encode(), headers=FORM)
         if parsers.result_total(resp.text) == 0:  # nothing to sort or page: the result page has no such form
-            return resp.text
-        if sort:  # the page's sort select submits the whole result form again with another sortby
-            form = parsers.result_form_fields(resp.text)
-            # no sort control on the page (over 2000 hits) or already in that order: no extra request
-            if "sortby" in form and form["sortby"] != sort:
-                form["sortby"] = sort
-                resp = await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
-        if page > 1:
-            form = parsers.result_form_fields(resp.text)  # replay the whole form, as a browser would
-            form.update({"jmpage": str(page), "jumpfmt1page": "跳至"})
+            return resp
+        if not (sort or per_page):
+            return resp
+        form = parsers.result_form_fields(resp.text)
+        changes = {}
+        if sort and "sortby" in form and form["sortby"] != sort:
+            changes["sortby"] = sort
+        if per_page and form.get("jpsize") != str(per_page):
+            changes["jpsize"] = str(per_page)
+        if changes:
+            form.update(changes)
             resp = await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
+        return resp
+
+    async def _jump(self, resp, page: int, per_page: int):
+        form = parsers.result_form_fields(resp.text)  # replay the whole form, as a browser would
+        form.update({"jmpage": str(page), "jumpfmt1page": "跳至"})
+        if per_page:
+            form["jpsize"] = str(per_page)
+        return await self._session_request("POST", "/result", content=urlencode(form).encode(), headers=FORM)
+
+    async def search_html(self, query: str, page: int = 1, fields: tuple[str, ...] = ("ti", "kw"),
+                          match: str = "es0", sort: str = "", per_page: int = 0) -> str:
+        """Fresh search every call (result sets are per-session and get overwritten), then jump to `page`.
+        per_page 0 = whatever the site shows by default (20 for guests, 10 seen for members)."""
+        resp = await self._search(query, fields, match, sort, per_page)
+        if page > 1 and parsers.result_total(resp.text) != 0:
+            resp = await self._jump(resp, page, per_page)
         return resp.text
 
     async def detail_html(self, thesis_id: str) -> str:
@@ -69,11 +88,17 @@ class SessionApi:
         return (await self._session_request("GET", path)).text
 
     async def record_html(self, query: str, index: int, fields: tuple[str, ...] = ("ti", "kw"),
-                          match: str = "es0", sort: str = "") -> str:
+                          match: str = "es0", sort: str = "", per_page: int = 0) -> str:
         """Detail page of result number `index` (1-based, global) of a fresh search. Used for rows whose list
         entry carries no thesis id. Result sets are per-session and overwritten by any other query, so the
-        search is repeated right before the lookup (and the page jump when needed)."""
-        await self.search_html(query, page=(index - 1) // PAGE_SIZE + 1, fields=fields, match=match, sort=sort)
+        search is repeated right before the lookup, and the page that holds `index` is opened first. The page
+        size is read from the page itself (it differs between guests and members), not assumed."""
+        resp = await self._search(query, fields, match, sort, per_page)
+        if parsers.result_total(resp.text) != 0:
+            size = int(parsers.result_form_fields(resp.text).get("jpsize") or PAGE_SIZE)
+            page = (index - 1) // size + 1
+            if page > 1:
+                await self._jump(resp, page, per_page)
         return (await self._session_request("GET", f"/record?r1={index}&h1=1")).text
 
 

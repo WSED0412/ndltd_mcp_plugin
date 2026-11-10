@@ -78,7 +78,7 @@ def _check_title(d, expected_title: str) -> None:
 
 
 async def _load_detail(thesis_id: str, query: str, index: int, fields: str, match: str, sort: str = "",
-                       expected_title: str = ""):
+                       expected_title: str = "", per_page: int = 0):
     """Detail page by thesis id, or by (query, index) for rows the list shows without an id.
     Returns (Detail, thesis_id or None, provenance note or '')."""
     thesis_id, query = (thesis_id or "").strip(), re.sub(r"\s+", " ", (query or "").strip())
@@ -90,7 +90,8 @@ async def _load_detail(thesis_id: str, query: str, index: int, fields: str, matc
         return d, thesis_id, ""
     if query and index >= 1:
         f, m, so = options.resolve_fields(fields), options.resolve_match(match), options.resolve_sort(sort)
-        d = parsers.parse_detail(await get_client().record_html(query, index, fields=f, match=m, sort=so))
+        pp = options.resolve_per_page(per_page)
+        d = parsers.parse_detail(await get_client().record_html(query, index, fields=f, match=m, sort=so, per_page=pp))
         _check_title(d, expected_title)
         return d, None, f"依搜尋「{query}」第 {index} 筆取得，請核對篇名"
     raise NdltdError("請提供 thesis_id，或同時提供 query 與 index（>=1）。")
@@ -98,12 +99,13 @@ async def _load_detail(thesis_id: str, query: str, index: int, fields: str, matc
 
 @_tool
 async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_FIELDS,
-                       match: str = options.DEFAULT_MATCH, sort: str = options.DEFAULT_SORT) -> str:
+                       match: str = options.DEFAULT_MATCH, sort: str = options.DEFAULT_SORT,
+                       per_page: int = options.DEFAULT_PER_PAGE) -> str:
     """搜尋臺灣博碩士論文。多個詞以空白分隔。
 
     Args:
         query: 搜尋詞，例如「微積分 學習策略」。
-        page: 頁碼，從 1 開始（每頁 20 筆；每次呼叫都會重新搜尋）。
+        page: 頁碼，從 1 開始（每次呼叫都會重新搜尋）。
         fields: 搜尋欄位，逗號分隔：title（論文名稱）、author（研究生）、advisor（指導教授）、committee（口試委員）、
             keyword（關鍵詞）、abstract（摘要）、references（參考文獻），或 all。預設 title,keyword。
         match: 比對方式：exact（精準，預設）、fuzzy（模糊）、homophone（同音）、synonym（同義詞）。
@@ -113,6 +115,8 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
             cited_desc（被引用）、views_desc（點閱）、downloads_desc、title_asc、author_asc、school_asc 等。
             指定排序會多發一個請求。**站方在結果超過 2000 筆時不提供排序**，這時結果維持預設順序，
             輸出會明說「排序沒有套用」；請加更多關鍵詞或換欄位縮小範圍後再排序。
+        per_page: 每頁筆數，10／20／30／50／100，0（預設）＝站方預設（訪客 20，登入會員曾見 10）。
+            改每頁筆數會多發一個請求（和 sort 合併成一個）；100 筆的輸出很長，請只在需要整批瀏覽時使用。
     回傳總筆數，以及本頁每筆的篇名、研究生、指導教授、學校系所、學年度、論文編號。
     """
     query = (query or "").strip()
@@ -121,15 +125,18 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
     if page < 1:
         raise NdltdError("page 必須 >= 1。")
     f, m, so = options.resolve_fields(fields), options.resolve_match(match), options.resolve_sort(sort)
-    html = await get_client().search_html(query, page, fields=f, match=m, sort=so)
+    pp = options.resolve_per_page(per_page)
+    html = await get_client().search_html(query, page, fields=f, match=m, sort=so, per_page=pp)
     res = parsers.parse_search(html)
     extra = ""
     if (fields, match) != (options.DEFAULT_FIELDS, options.DEFAULT_MATCH):
         extra = f", fields=\"{fields}\", match=\"{match}\""
     if so:
         extra += f", sort=\"{sort}\""
+    if pp:
+        extra += f", per_page={pp}"
     lines = [f"共 {res.total} 筆；第 {page} 頁（本頁 {len(res.rows)} 筆）｜{options.describe(f, m)}"
-             + (f"｜排序：{sort}" if so else "")]
+             + (f"｜排序：{sort}" if so else "") + (f"｜每頁 {pp} 筆" if pp else "")]
     if so and parsers.current_sort(html) != so:
         lines.append(
             f"注意：排序沒有套用，下列是站方預設順序。站方在結果超過 2000 筆時不提供排序（這次共 {res.total} 筆）；"
@@ -157,12 +164,13 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
 async def ndltd_abstract(thesis_id: str = "", query: str = "", index: int = 0,
                          fields: str = options.DEFAULT_FIELDS, match: str = options.DEFAULT_MATCH,
                          sort: str = options.DEFAULT_SORT, expected_title: str = "",
+                         per_page: int = options.DEFAULT_PER_PAGE,
                          include_toc: bool = False, include_references: bool = False) -> str:
     """讀取完整書目、中英文摘要與關鍵詞。兩種用法擇一：
 
     1. thesis_id：論文編號，例如 099NCTU5507087（由 ndltd_search 取得）。
     2. query + index：搜尋結果列表沒有論文編號的論文（全文延後公開者），用原本的搜尋詞與
-       ndltd_search 顯示的序號（例如 21）；fields、match、sort 要和當時搜尋時相同。會重新搜尋再取該筆。
+       ndltd_search 顯示的序號（例如 21）；fields、match、sort、per_page 要和當時搜尋時相同。會重新搜尋再取該筆。
 
     Args:
         expected_title: 建議一律帶上（ndltd_search 的提示已附上）。取得的篇名和它不符時會直接報錯，
@@ -170,7 +178,7 @@ async def ndltd_abstract(thesis_id: str = "", query: str = "", index: int = 0,
         include_toc: 附上目次（同一頁，不多發請求；預設關閉）。
         include_references: 附上參考文獻（同一頁，清單可能很長；預設關閉）。
     """
-    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort, expected_title)
+    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort, expected_title, per_page)
     return (f"（{note}）\n" if note else "") + parsers.format_detail(
         d, tid, include_toc=include_toc, include_references=include_references)
 
@@ -178,7 +186,8 @@ async def ndltd_abstract(thesis_id: str = "", query: str = "", index: int = 0,
 @_tool
 async def ndltd_cite(thesis_id: str = "", query: str = "", index: int = 0,
                      fields: str = options.DEFAULT_FIELDS, match: str = options.DEFAULT_MATCH,
-                     sort: str = options.DEFAULT_SORT, expected_title: str = "", format: str = "apa") -> str:
+                     sort: str = options.DEFAULT_SORT, expected_title: str = "",
+                     per_page: int = options.DEFAULT_PER_PAGE, format: str = "apa") -> str:
     """產生學位論文的引用。用法同 ndltd_abstract（thesis_id，或 query + index）。
 
     Args:
@@ -187,7 +196,7 @@ async def ndltd_cite(thesis_id: str = "", query: str = "", index: int = 0,
             BibTeX 與 RIS 可匯入 Zotero、Mendeley、EndNote。
     引用只用詳目頁已有的欄位，並以論文出版年（西元）為年份；請與原頁面核對。
     """
-    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort, expected_title)
+    d, tid, note = await _load_detail(thesis_id, query, index, fields, match, sort, expected_title, per_page)
     return cite.make(format, d, tid, note)
 
 
