@@ -153,7 +153,7 @@ Do not refresh repeatedly and do not change IP. First check by hand in a browser
 **Verified on the real site (Chrome, November 2026)**
 
 - Search: choosing fields (for example by advisor), page 2, `per_page` (50 rows), compact format and the count columns.
-- Sorting (「微積分」, 185 hits): `year_desc` (114, 114, 114, 114, 113…), `year_asc` (69, 73, 74, 75…), `title_asc`, `school_asc`, `author_asc` (Latin names first, then by stroke count), `cited_desc` (28, 23, 19, 15, 14…), `views_desc` (3510, 1659, 1489…), `downloads_desc` (697, 545, 379…) and `views_asc` (14, 18, 18, 19, 46…) all work; the first 10 hits of `downloads_asc` are all 0, which agrees with ascending order but is all ties. When a result set has more than 2000 hits the site offers no sorting (「人工智慧」, 7,190 hits, once showed no effect for that reason) and the output says so.
+- Sorting (「微積分」, 185 hits): `year_desc` (114, 114, 114, 114, 113…), `year_asc` (69, 73, 74, 75…), `title_asc`, `school_asc`, `author_asc` (Latin names first, then by stroke count), `cited_desc` (28, 23, 19, 15, 14…), `views_desc` (3510, 1659, 1489…), `downloads_desc` (697, 545, 379…) and `views_asc` (14, 18, 18, 19, 46…) all work; the first 10 hits of `downloads_asc` are all 0, which agrees with ascending order but is all ties. The reverse directions work too: `author_desc` (by stroke count, descending: 蘇 22, 嚴 20, 羅 19, 魏 18, 謝 17…), `title_desc` (關 19, 雙 18, 藉 18, 應 17…, Latin titles last), `school_desc`, and `relevance_asc` (its first 5 hits are exactly the last 5 of the default order, hits 185 to 181, reversed). When a result set has more than 2000 hits the site offers no sorting (「人工智慧」, 7,190 hits, once showed no effect for that reason) and the output says so.
 - Abstracts: by thesis ID, by query + serial number (theses without an ID), with table of contents and references; APA citation.
 - Member export (login required): bibliography + both abstracts + table of contents + references came back as real content; ticking and clearing, no `cache=`, and the stop behaviour.
 - Match modes: `synonym` for 「人工智慧」 gave more hits than `exact` (11,057 vs 7,190), the extra ones including unrelated theses; `homophone` for the advisor 「蔡炎龍」 equals `exact` (65 hits), tried once. So no non-exact mode is recommended as a default.
@@ -165,7 +165,6 @@ Do not refresh repeatedly and do not change IP. First check by hand in a browser
 
 - Session lifetime was not measured: one logged-in session lasted several hours and was gone overnight (rough observation). When it expires the tool asks you to type the captcha again.
 - RIS / BibTeX were not actually imported into Zotero / EndNote.
-- `relevance_asc`, `author_desc`, `title_desc` and `school_desc` were not tried.
 - Member export: if the site leaves a block out when a thesis lacks a table of contents or a foreign-language abstract, content could be shifted; there is only a light check and no such thesis was tested.
 - Firefox: the manifest is compatible, but it was not fully verified.
 - Plain-HTTP mode (`NDLTD_MODE=http`): the site currently blocks it (blank page); its captcha form fields were not verified against a real page either. The browser-bridge mode needs neither.
