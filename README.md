@@ -1,23 +1,27 @@
 # ndltd-mcp
 
-臺灣博碩士論文知識加值系統（國圖 NDLTD，<https://ndltd.ncl.edu.tw/>）的**本機** MCP server：只查書目與摘要，不下載全文。
+**English** | [繁體中文](README.zh-TW.md)
 
-> ⚠️ **使用前請先讀下方〈使用規範與風險自負〉。** 站方會限流，本專案的存取方式也刻意保守。
+A **local** MCP server for the Taiwan thesis system (NDLTD, National Central Library: <https://ndltd.ncl.edu.tw/>). It searches bibliographic records, reads abstracts and produces citations. It does **not** download full texts.
+
+> ⚠️ **Read "Terms of use and your own risk" below before using this.** The site rate-limits automated access, and this project's way of accessing it is deliberately conservative.
+
+Tool descriptions and tool output are in Traditional Chinese, because that is the language of the data (and of the site's field names, which are quoted below with an English gloss).
 
 ## Tools
 
-| Tool | 用途 |
+| Tool | What it does |
 |---|---|
-| `ndltd_search(query, page=1, fields="title,keyword", match="exact", sort="", per_page=0, compact=True)` | 搜尋。回傳總筆數＋本頁每筆的篇名、研究生、指導教授、學校系所、學年度、學位、學門／學類、被引用／點閱／下載／收藏次數、論文編號（次數與學門都在同一頁，不多發請求）。**預設用緊湊格式（`compact=True`）：每筆一行，欄位用「｜」分隔，開頭有欄位說明行，沒有論文編號的提示只在最後寫一次**；`compact=False` 則每筆多行，較易讀但很長。`fields`：`title`（論文名稱）、`author`（研究生）、`advisor`（指導教授）、`committee`（口試委員）、`keyword`、`abstract`、`references`，逗號分隔，或 `all`。`match`：`exact`（預設）、`fuzzy`、`homophone`、`synonym`。**非精準模式都不建議當預設**：`fuzzy` 對常見詞回極大量無關結果（實測「微積分」回三十多萬筆）；`synonym` 筆數多約五成且夾雜無關論文；`homophone` 只試過一例，與 `exact` 相同。輸出會附警告。`sort` 留空＝站方預設（相關度）；`year_desc`（要最新論文）、`year_asc`、`cited_desc`（被引用）、`views_desc`、`downloads_desc`、`title_asc`、`author_asc`、`school_asc` 等，指定排序會多發一個請求（`relevance` 等同預設，不多發）。**站方在結果超過 2000 筆時不提供排序**（頁面寫「超過排序上限 2000 筆」），這時結果維持預設順序，輸出會明說「排序沒有套用」；2000 筆以內實測有效。`per_page`：每頁筆數 10／20／30／50／100，0（預設）＝站方預設（訪客 20，登入會員曾見 10）；改變時和 `sort` 合併成同一個額外請求（實測：「微積分」`per_page=50`＋`year_desc` 一次送出得 50 筆、學年度 114…107 遞減、共 4 頁；換每頁筆數時頁面會把隱藏欄位 `SubmitChangePage` 設成 1，沒有它站方會忽略筆數；用 `ndltd_search` 本身實測也得 50 筆）。輸出標題的「每頁 N 筆」讀的是站方頁面實際選中的筆數，站方沒照辦時會寫「你要求 N，但站方沒有套用」。用 `query`＋`index` 讀摘要或引用時，`sort`、`per_page` 要和搜尋時相同。 |
-| `ndltd_abstract(thesis_id)` 或 `ndltd_abstract(query, index, fields, match, sort, per_page, expected_title)` | 完整書目＋中英文摘要＋關鍵詞，選填 `include_toc`（目次）、`include_references`（參考文獻），兩者來自同一頁、不多發請求。列表沒有論文編號的論文（全文延後公開者），用原搜尋詞與搜尋結果的序號讀取（`fields`、`match`、`sort`、`per_page` 要和當時相同）；建議帶 `expected_title`（搜尋結果的提示已附上），取得的篇名不符就報錯，避免序號對到別篇。 |
-| `ndltd_export_full(query, …, confirm=True)` | **實驗性、預設不存在、僅限已登入的國圖會員**：一次取回一頁結果的書目＋中英文摘要。見下一節。 |
-| `ndltd_cite(thesis_id)` 或 `ndltd_cite(query, index, …, expected_title, format="apa")` | 學位論文引用：`apa`（APA 7，中文格式：`作者（年）。*篇名*〔碩士論文，校院〕。臺灣博碩士論文知識加值系統。網址`）、`bibtex`（`@mastersthesis`／`@phdthesis`）、`ris`（`TY - THES`），可匯入 Zotero、Mendeley、EndNote。年份用論文出版年（西元）。**APA 只支援中文姓名的作者**（外文姓名要轉成「姓, 名縮寫」，自動轉換容易出錯，這時請用 bibtex／ris）；篇名是英文沒關係；沒有永久網址時引用會省略網址。引用只用詳目頁已有的欄位，請與原頁面核對。 |
+| `ndltd_search(query, page=1, fields="title,keyword", match="exact", sort="", per_page=0, compact=True)` | Search. Returns the total hit count and, for each hit on the page: title, student, advisor, school and department, graduation year, degree, field/category, counts of citations / views / downloads / favorites, and the thesis ID (the counts and the field come from the same page, so they cost no extra request). **The default output is compact (`compact=True`): one line per hit, columns separated by `｜`, a legend line at the top, and the hint for hits without a thesis ID written once at the end.** `compact=False` gives a multi-line layout that is easier to read but much longer. `fields`: `title` (論文名稱), `author` (研究生), `advisor` (指導教授), `committee` (口試委員), `keyword`, `abstract`, `references`, comma separated, or `all`. `match`: `exact` (default), `fuzzy`, `homophone`, `synonym`. **None of the non-exact modes is recommended as a default**: `fuzzy` returns a huge number of unrelated hits for common words (measured: 330,000+ hits for 「微積分」, calculus); `synonym` returns about 50 % more hits mixed with unrelated theses; `homophone` was tried once and returned the same as `exact`. The output carries a warning. `sort`: empty = the site's default (relevance); `year_desc` (newest first), `year_asc`, `cited_desc`, `views_desc`, `downloads_desc`, `title_asc`, `author_asc`, `school_asc` and so on. Sorting costs one extra request (`relevance` equals the default and costs nothing). **The site offers no sorting when a result set has more than 2000 hits** (the page says 「超過排序上限 2000 筆」, "over the sort limit of 2000"); the results then stay in the default order and the output says "sort not applied". Within 2000 hits sorting was verified. `per_page`: 10 / 20 / 30 / 50 / 100; 0 (default) = the site's default (20 for guests, 10 was seen for logged-in members). Changing it is merged with `sort` into a single extra request (measured: 「微積分」 with `per_page=50` + `year_desc` in one post gave 50 rows, years 114…107 descending, 4 pages; when the page size changes the page sets the hidden field `SubmitChangePage` to 1 — without it the site ignores the size; confirmed with `ndltd_search` itself, 50 rows). The "per page N" in the output header is the size the site's page actually shows; if the site did not apply your request, the header says so. When you read an abstract or a citation by `query` + `index`, `sort` and `per_page` must be the same as in the search. |
+| `ndltd_abstract(thesis_id)` or `ndltd_abstract(query, index, fields, match, sort, per_page, expected_title)` | Full bibliographic record + Chinese and English abstracts + keywords; optionally `include_toc` (table of contents) and `include_references`, both from the same page at no extra request. For theses that the list shows without an ID (typically embargoed full text), read them by the original query and the hit's serial number (`fields`, `match`, `sort` and `per_page` must be the same as in the search). Passing `expected_title` is recommended (the hint in the search output already includes it): if the title that comes back differs, the call fails instead of returning another thesis. |
+| `ndltd_export_full(query, …, confirm=True)` | **Experimental, absent by default, for logged-in members of the library only**: one page of results as bibliography + Chinese and English abstracts in a single go. See the next section. |
+| `ndltd_cite(thesis_id)` or `ndltd_cite(query, index, …, expected_title, format="apa")` | Citation of a thesis: `apa` (APA 7 in Chinese style: `Author（year）。*Title*〔碩士論文，School〕。臺灣博碩士論文知識加值系統。URL`), `bibtex` (`@mastersthesis` / `@phdthesis`), `ris` (`TY - THES`); importable into Zotero, Mendeley and EndNote. The year is the publication year (Gregorian). **APA supports Chinese-named authors only** (a romanised name would need conversion to "Family, G.-S.", which is error-prone, so use bibtex / ris then); an English title is fine; without a permanent URL the reference simply omits it. Citations use only fields already on the record page — please check them against the page. |
 
-## 使用示範
+## Usage walkthrough
 
-以下輸出是 2026-11 在真實站台取得的（節錄；書目資料來自國圖公開的檢索結果）。
+The output below was taken from the real site in November 2026 (excerpt; the bibliographic data comes from the library's public search results).
 
-**搜尋，依被引用次數排序**：`ndltd_search(query="微積分", sort="cited_desc", per_page=20)`
+**Search, sorted by number of citations**: `ndltd_search(query="微積分", sort="cited_desc", per_page=20)`
 
 ```
 共 185 筆；第 1 頁（本頁 20 筆）｜欄位：論文名稱、關鍵詞｜比對：exact｜排序：cited_desc｜每頁 20 筆
@@ -28,138 +32,140 @@
 標示「（無編號…）」的沒有論文編號；讀摘要或引用請用 ndltd_abstract／ndltd_cite(query="微積分", index=<序號>, sort="cited_desc", per_page=20, expected_title=<該筆的篇名>)。
 ```
 
-**讀沒有編號的那篇**：照提示帶上同樣的條件，並帶 `expected_title`，序號對不到同一篇就會報錯：
+In English: "185 hits; page 1 (20 on this page) | fields: title, keyword | match: exact | sort: cited_desc | 20 per page". The legend line reads: serial number | title | student | advisor | school, department, year, degree | field / category | citations / views / downloads / favorites | thesis ID. The last line says: hits marked "（無編號…）" have no thesis ID; to read the abstract or the citation, call `ndltd_abstract` / `ndltd_cite` with the query, `index=<serial number>`, the same sort and page size, and `expected_title=<that hit's title>`.
+
+**Read a thesis that has no ID**: pass the same conditions as in the hint, plus `expected_title`; if the serial number does not lead to the same thesis, the call fails:
 
 ```
 ndltd_abstract(query="微積分", index=1, sort="cited_desc", per_page=20, expected_title="台灣地區大學生微積分學習態度的研究")
 ```
 
-**讀有編號的那篇，並附目次與參考文獻**：`ndltd_abstract(thesis_id="102NCU05479004", include_toc=True)`
+**Read a thesis that has an ID, with its table of contents**: `ndltd_abstract(thesis_id="102NCU05479004", include_toc=True)`
 
-**引用**：`ndltd_cite(thesis_id="113NCCU5507018", format="apa")`
+**Cite**: `ndltd_cite(thesis_id="113NCCU5507018", format="apa")`
 
 ```
 林佩昀（2025）。*ScoreRAG：基於檢索增強生成與一致性相關性評分的結構化新聞生成框架*〔碩士論文，國立政治大學〕。臺灣博碩士論文知識加值系統。https://hdl.handle.net/11296/967g89
 ```
 
-`format` 也可以是 `bibtex` 或 `ris`，可匯入 Zotero、Mendeley、EndNote。
+`format` can also be `bibtex` or `ris`, for Zotero, Mendeley and EndNote.
 
-**依指導教授找**：`ndltd_search(query="蔡炎龍", fields="advisor")`（實測 65 筆）。
+**Find by advisor**: `ndltd_search(query="蔡炎龍", fields="advisor")` (65 hits when measured).
 
-**結果太多時**：超過 2000 筆站方不提供排序，輸出會說明；先加關鍵詞或換欄位縮小範圍，再排序。
+**Too many hits**: above 2000 hits the site offers no sorting and the output says so; add keywords or change the field to narrow the search first, then sort.
 
-## 實驗性：會員匯出（預設關閉）
+## Experimental: member export (off by default)
 
-`ndltd_export_full`：用站方自己的「完整書目」匯出，一次取回一頁搜尋結果的書目＋中英文摘要（選填目次、參考文獻）。
-**只提供給已登入的國圖會員**（站方對訪客不開放完整書目），所以預設不存在，必須明確開啟：
+`ndltd_export_full` uses the site's own "完整書目" (complete record) export and returns one page of search results as bibliography + Chinese and English abstracts (optionally table of contents and references).
+**The site offers it to logged-in library members only** (guests do not get the complete record), so the tool does not exist unless you turn it on explicitly:
 
 ```powershell
 claude mcp remove ndltd
-claude mcp add --scope user -e NDLTD_EXPERIMENTAL_EXPORT=1 ndltd -- uv --directory "<專案資料夾完整路徑>" run --quiet ndltd-mcp
+claude mcp add --scope user -e NDLTD_EXPERIMENTAL_EXPORT=1 ndltd -- uv --directory "<full path of this project>" run --quiet ndltd-mcp
 ```
 
-- 你要先**自己在瀏覽器登入**國圖（本專案不碰帳號密碼）；工具沿用該瀏覽器分頁的登入狀態。
-- 每次呼叫要明確帶 `confirm=True`，否則不發任何請求；一次最多 20 筆（站方的輸出上限是 50 筆）。
-- 每次約 5 個請求：搜尋、清除勾選、勾選本頁、預覽、清除勾選（指定排序、每頁筆數或 page>1 時最多再多 2 個）。比逐篇 `ndltd_abstract` 省，但請求帶著你的會員身分。遇到空白頁或驗證碼會直接停止，連最後的清除勾選也不再發。
-- 預覽的書目、中文摘要、外文摘要、目次、參考文獻是依區塊**順序**對應的（實測 10 筆都一致）；站方若在缺項時省略區塊，內容可能錯位。工具只做輕量檢查，內容明顯對不上時會在輸出附備註，請與詳目頁核對。
-- 勾選記錄會留在站方的 session 裡、跨搜尋保留，所以工具會先清除、核對站方回報的勾選數、取回預覽、再清除，並核對每筆篇名與搜尋結果一致；任何一步不符就中止。
-- **不確定的事**：站方使用規範我們沒讀到，大量匯出是否允許不確定，帳號可能被限制，風險自負；這個功能依賴頁面的內部請求（`getchecker`、`previewsave`），改版就會壞。
-- 實測（2026-11）：10 筆預覽 1 個請求、約 12 萬字，其中 9 筆有摘要與參考文獻。勾選請求不帶 `cache=` 參數也正常（清除→0、勾 1–3→3、勾 4–5→5，重送相同網址得 5 而非 3，表示擴充功能的 `cache: "no-store"` 有效，沒被 HTTP 快取吃掉）。用 `ndltd_export_full` 本身取 2～3 筆，書目、中英文摘要、目次、參考文獻都取回真實內容（目次與參考文獻很長，所以預設不附）；每次約 5 個請求。
+- **You log in to the site yourself, in your browser** (this project never handles your account name or password); the tool reuses the login state of that browser tab.
+- Every call needs an explicit `confirm=True`, otherwise no request is sent. At most 20 records per call (the site's own export limit is 50).
+- About 5 requests per call: search, clear ticks, tick this page, preview, clear ticks (up to 2 more when you give `sort`, `per_page` or `page>1`). That is cheaper than one `ndltd_abstract` per thesis, but the requests carry your member identity. On a blank page or a captcha the tool stops immediately — it does not even send the final "clear ticks".
+- The preview's bibliography, Chinese abstract, foreign-language abstract, table of contents and references are matched **by block order** (identical on all 10 records measured). If the site leaves a block out when something is missing, the content could be shifted. The tool only does a light check and adds a note to the output when content plainly does not fit; please compare with the record page.
+- The site keeps ticked records in your session across searches, so the tool clears first, checks the tick count the site reports, fetches the preview, clears again, and checks that every title matches the search result; it aborts at the first mismatch.
+- **What we do not know**: we could not read the site's terms of use, so whether bulk export is allowed is unknown, your account might be restricted, and the risk is yours. The feature relies on internal requests of the page (`getchecker`, `previewsave`) and will break if the site changes.
+- Measured (November 2026): a 10-record preview was 1 request and about 120,000 characters, 9 of the 10 with abstract and references. The tick requests also work without a `cache=` parameter (clear→0, tick 1–3→3, tick 4–5→5, and repeating the same URL gives 5, not 3, so the extension's `cache: "no-store"` works and nothing is served from the HTTP cache). With `ndltd_export_full` itself, 2–3 records came back with bibliography, both abstracts, table of contents and references as real content (the table of contents and references are long, so they are off by default); about 5 requests per call.
 
-## 為什麼要有瀏覽器擴充功能
+## Why a browser extension
 
-站方對 Python 的 HTTP 客戶端回「Blank page」（限流／封鎖），但真人用瀏覽器可以進站（會出現圖形驗證碼）。
-本專案**不偽裝瀏覽器、不辨識驗證碼、不換 IP**，而是讓請求真的由你自己的瀏覽器發出：
+The site answers Python HTTP clients with a "Blank page" (rate limit / block), while a person using a browser gets in (and sees an image captcha).
+This project **does not pretend to be a browser, does not solve the captcha and does not change IP**; instead, the requests are really made by your own browser:
 
 ```
-Claude ──stdio──> ndltd-mcp ──127.0.0.1 long-poll──> 瀏覽器擴充功能 ──同源 fetch──> ndltd 分頁
+Claude ──stdio──> ndltd-mcp ──127.0.0.1 long-poll──> browser extension ──same-origin fetch──> ndltd tab
 ```
 
-- 驗證碼由你本人在瀏覽器分頁輸入；程式不讀圖片、不 OCR、不用打碼服務。
-- 回應的 HTML 只留在本機 MCP 程序內解析，對話只收到整理後的書目與摘要。
-- 本機橋接口只綁 `127.0.0.1`，要求 token 標頭，檢查 `Host`／`Origin`，不送任何 CORS 標頭。
-- 擴充功能沒有常駐的頁面腳本：只在收到工作時才對 ndltd 分頁臨時注入一小段程式，平常瀏覽該站不受影響。
+- You type the captcha yourself in the browser tab; the program never reads the image, never uses OCR and never uses a solving service.
+- The HTML stays inside the local MCP process and is parsed there; the conversation only receives the parsed bibliography and abstracts.
+- The local bridge binds to `127.0.0.1` only, requires a token header, checks `Host` / `Origin` and sends no CORS headers.
+- The extension has no resident page script: it injects a small function into the ndltd tab only when a job arrives, so ordinary browsing of the site is not affected.
 
-## 行為與限制（刻意的）
+## Behaviour and limits (deliberate)
 
-- 請求間隔至少 3 秒；每次呼叫只抓一頁；**沒有自動翻頁整批抓取的功能**（刻意不做，見下）。唯一的批次例外是上面預設關閉的會員匯出：它一次取回一頁、最多 20 筆的摘要。
-- 不做全文下載、不做快取。
-- 遇到「Blank page」或驗證碼就停，不自動重試。
-- 輸出裡的錯誤分開回報：連不上／逾時、頁面結構不符、被限流、需要驗證碼。解析不到的欄位寫「（無）」，不猜。
+- At least 3 seconds between requests; one page per call; **no automatic multi-page bulk harvesting** (deliberately not built, see below). The one batch exception is the member export above, which is off by default: it returns the abstracts of one page, at most 20 records.
+- No full-text download, no caching.
+- On a "Blank page" or a captcha it stops and does not retry.
+- Errors are reported separately: cannot connect / timeout, page structure does not match, rate-limited, captcha needed. Fields that cannot be parsed are written as 「（無）」 ("none") — nothing is guessed.
 
-## 使用規範與風險自負（請先讀）
+## Terms of use and your own risk (please read)
 
-**我們知道的：**
+**What we know:**
 
-- 站方的 [`robots.txt`](https://ndltd.ncl.edu.tw/robots.txt) 允許 `/cgi-bin`，並對一些路徑設了 `Disallow`（例如 `/download/`、含 `cache=` 的網址、部分 `dnclcdr` 檢索網址）。本專案只經由站內的搜尋與詳目頁，不碰全文下載路徑；純 HTTP 模式的進站網址也刻意不帶 `cache=` 參數（站方首頁自己的腳本會帶，那是頁面在瀏覽器裡的行為，不是我們另外發的請求）。但我們沒有逐條比對所有規則，**不能保證完全符合**。
-- 進站時站方會要求圖形驗證碼，頁面說明的理由是系統人數眾多、為維護服務品質。
-- 站方對沒有瀏覽器特徵的程式化存取會直接回空白頁（實測，原因不明，可能是限流或客戶端特徵）。
+- The site's [`robots.txt`](https://ndltd.ncl.edu.tw/robots.txt) allows `/cgi-bin` and disallows some paths (for example `/download/`, URLs containing `cache=`, some `dnclcdr` search URLs). This project only goes through the site's search and record pages and never touches the full-text download paths; the plain-HTTP mode's entry URL also deliberately carries no `cache=` parameter (the site's own home-page script adds one — that is the page's behaviour inside the browser, not a request we send separately). But we did not check every rule line by line, so we **cannot guarantee full compliance**.
+- On entry the site asks for an image captcha; the reason the page gives is that many people are using the system and it wants to keep the service quality up.
+- The site answers programmatic access that does not look like a browser with a blank page (measured; the reason is unknown, it may be rate limiting or a client fingerprint).
 
-**我們不知道的：**
+**What we do not know:**
 
-- **站方的使用規範／著作權聲明頁，我們沒能讀到**（開發時相關頁面被驗證碼擋住，只讀到 `robots.txt`）。所以本專案是否符合站方對「自動化程式」、書目與摘要再利用、AI 處理等方面的規定，**作者無法確定**。請你自己在瀏覽器開站上的使用規範閱讀，有疑慮先問你的學校圖書館或國圖。
-- 國圖 2024 年底的公文表示，系統 API 的欄位擴充仍在評估中；學位論文書目資料的申請也要先諮詢智慧財產局（摘要等欄位可能涉及著作權）。若你需要大量書目，比較合適的做法是走官方資料：NCHC 平台上有[以學年度分檔的「臺灣博碩士論文系統書目檔」CSV](https://ark.nchc.org.tw/dataset/best_wish14024)。
+- **We could not read the site's terms of use / copyright notice** (the relevant pages were behind the captcha while this was developed; only `robots.txt` was read). So whether this project complies with the site's rules on "automated programs", on reuse of bibliographic data and abstracts, on AI processing and so on is something **the author cannot determine**. Please read the site's terms yourself in a browser, and if in doubt ask your school's library or the National Central Library.
+- A late-2024 official letter from the National Central Library says that extending the fields of the system's API is still being evaluated, and that requests for thesis bibliographic data must first consult the Intellectual Property Office (abstracts and similar fields may involve copyright). If you need bibliographic data in bulk, official data is the more suitable route: the NCHC platform has [the bibliographic files of the thesis system, split by academic year, as CSV](https://ark.nchc.org.tw/dataset/best_wish14024).
 
-**作者不是律師，這裡不是法律意見。使用本專案（含程式碼、文件與任何輸出）的一切風險由你自行承擔**，包括但不限於 IP 或瀏覽器被站方限制，以及法律責任。
+**The author is not a lawyer and this is not legal advice. You use this project (code, documentation and any output) entirely at your own risk**, including but not limited to your IP address or browser being restricted by the site, and legal liability.
 
-**請遵守：**
+**Please:**
 
-1. 僅供**個人、非商業**的研究參考；不要重製、散布或做商業使用。
-2. 不要用本專案批次撈取站方內容，也不要把擷取到的書目或摘要放進自己的資料庫、知識庫、向量資料庫，或用來訓練模型。
-3. 被擋時就停：不要重新整理、不要換 IP 或換瀏覽器指紋繞過。
-4. 限速、誠實標示、不偽裝、不快取，**只是降低站方負擔的做法，不等於取得站方許可**。
+1. Use it for **personal, non-commercial** research reference only; do not reproduce, redistribute or use commercially.
+2. Do not use this project to harvest the site's content in bulk, and do not put the bibliographic data or abstracts you obtain into your own database, knowledge base or vector database, or use them to train models.
+3. When blocked, stop: do not refresh repeatedly, do not change IP or browser fingerprint to get around it.
+4. Rate limiting, honest identification, no disguise and no caching are **only ways to lower the load on the site; they are not permission from the site**.
 
-## 安裝
+## Installation
 
-需要 [uv](https://docs.astral.sh/uv/) 與 Chrome（或 Firefox）。
+You need [uv](https://docs.astral.sh/uv/) and Chrome (or Firefox).
 
 ```powershell
-cd <本專案資料夾>
+cd <this project>
 uv sync
-uv run pytest        # 離線測試，不連網
-claude mcp add --scope user ndltd -- uv --directory "<專案資料夾完整路徑>" run --quiet ndltd-mcp
+uv run pytest        # offline tests, no network
+claude mcp add --scope user ndltd -- uv --directory "<full path of this project>" run --quiet ndltd-mcp
 ```
 
-### 載入擴充功能（Chrome）
+### Load the extension (Chrome)
 
-1. 開 `chrome://extensions`，開啟「開發人員模式」。
-2. 「載入未封裝項目」→ 選本專案的 `extension` 資料夾。（Chrome 會對 `background.scripts` 印出無害的警告，那個欄位是給 Firefox 用的。）
-3. 啟動一次 ndltd-mcp（呼叫任一工具即可），它會產生 `%USERPROFILE%\.ndltd_mcp\token`。
-4. 開擴充功能的「選項」頁，貼上 token，儲存。（預設埠 8765；可用環境變數 `NDLTD_BRIDGE_PORT` 更改，選項頁要同步。）
-5. 先自己在瀏覽器開 `https://ndltd.ncl.edu.tw/`，輸入驗證碼，**停在有搜尋框的頁面不要關**，再呼叫工具。工具沒有可用的 session 時，會把分頁帶到首頁，請你本人輸入驗證碼後再呼叫一次。
-6. 擴充功能改版後，要在 `chrome://extensions` 按「重新載入」。
+1. Open `chrome://extensions` and turn on "Developer mode".
+2. "Load unpacked" → choose this project's `extension` folder. (Chrome prints a harmless warning about `background.scripts`; that key is for Firefox.)
+3. Start ndltd-mcp once (call any tool); it creates `%USERPROFILE%\.ndltd_mcp\token`.
+4. Open the extension's options page, paste the token and save. (The default port is 8765; change it with the environment variable `NDLTD_BRIDGE_PORT` and keep the options page in sync.)
+5. First open `https://ndltd.ncl.edu.tw/` in the browser yourself, type the captcha, **stay on a page with the search box**, then call a tool. When the tool has no usable session it takes the tab to the home page; type the captcha yourself and call again.
+6. After changing the extension, press "Reload" on `chrome://extensions`.
 
-### 用 Firefox 載入
+### Load in Firefox
 
-開 `about:debugging#/runtime/this-firefox` →「載入暫時性附加元件」→ 選 `extension/manifest.json`（重開瀏覽器後需重新載入）。token 與選項頁步驟相同。兩個瀏覽器不要同時載入，否則會搶同一個橋接口的工作。
+Open `about:debugging#/runtime/this-firefox` → "Load Temporary Add-on" → choose `extension/manifest.json` (it must be loaded again after the browser restarts). The token and options steps are the same. Do not load the extension in two browsers at once, or they will fight over the same bridge port.
 
-### 被擋成空白頁時
+### When you are blocked with a blank page
 
-不要重新整理、不要換 IP。先用瀏覽器手動確認自己能否進站；某個瀏覽器設定檔被擋時，可清除該網站的 cookie 與資料，或換另一個瀏覽器／設定檔。
+Do not refresh repeatedly and do not change IP. First check by hand in a browser whether you can get in; if one browser profile is blocked, clear that site's cookies and data, or use another browser or profile.
 
-### 工具回報「橋接口無法使用」或「擴充功能沒有連上」時
+### When a tool reports "bridge port unavailable" or "extension not connected"
 
-- **橋接口無法使用**：8765 埠被另一個程序占著，多半是前一次沒結束的 ndltd-mcp。程式刻意不和它共用埠（Windows 上共用會讓工作送到錯的程序）。結束舊的 `ndltd-mcp`（工作管理員或 `Get-Process`），再 `/mcp` 重新連線。
-- **擴充功能沒有連上**：確認 Chrome 開著、擴充功能已載入、選項頁的 token 和 `%USERPROFILE%\.ndltd_mcp\token` 相同、埠一致；改過擴充功能要重新載入。
+- **Bridge port unavailable**: another process is holding port 8765, most likely a previous ndltd-mcp that did not exit. The program deliberately does not share the port (on Windows sharing lets jobs go to the wrong process). End the old `ndltd-mcp` (Task Manager or `Get-Process`) and reconnect with `/mcp`.
+- **Extension not connected**: check that Chrome is open, the extension is loaded, the token on the options page equals `%USERPROFILE%\.ndltd_mcp\token`, and the port matches; reload the extension after changing it.
 
-## 狀態
+## Status
 
-**已在真實站台驗證（Chrome，2026-11）**
+**Verified on the real site (Chrome, November 2026)**
 
-- 搜尋：欄位選擇（例如依指導教授）、第 2 頁、`per_page`（50 筆）、緊湊格式與次數欄位。
-- 排序（「微積分」185 筆）：`year_desc`（114、114、114、114、113…）、`year_asc`（69、73、74、75…）、`title_asc`、`school_asc`、`author_asc`（Latin 在前，再依筆劃）、`cited_desc`（28、23、19、15、14…）、`views_desc`（3510、1659、1489…）、`downloads_desc`（697、545、379…）、`views_asc`（14、18、18、19、46…）皆有效；`downloads_asc` 前 10 筆都是 0，與遞增一致但全是並列。結果超過 2000 筆時站方不提供排序（「人工智慧」7,190 筆曾因此沒有效果），輸出會明說。
-- 摘要：用論文編號、用「搜尋詞＋序號」（沒有編號的論文）、含目次與參考文獻；APA 引用。
-- 會員匯出（需登入）：書目＋中英文摘要＋目次＋參考文獻都取回真實內容；勾選與清除、不帶 `cache=`、遇到停止的行為。
-- 比對方式：`synonym` 搜「人工智慧」比 `exact` 多（11,057 對 7,190 筆），多出的有寺廟彩畫、胡笳十八拍之類無關論文；`homophone` 搜指導教授「蔡炎龍」與 `exact` 相同（65 筆），只試了這一例。所以非精準模式都不建議當預設。
-- 橋接口：擴充功能長輪詢、驗證碼由使用者輸入、保活後閒置 10 分鐘的第一個請求約 5 秒。
+- Search: choosing fields (for example by advisor), page 2, `per_page` (50 rows), compact format and the count columns.
+- Sorting (「微積分」, 185 hits): `year_desc` (114, 114, 114, 114, 113…), `year_asc` (69, 73, 74, 75…), `title_asc`, `school_asc`, `author_asc` (Latin names first, then by stroke count), `cited_desc` (28, 23, 19, 15, 14…), `views_desc` (3510, 1659, 1489…), `downloads_desc` (697, 545, 379…) and `views_asc` (14, 18, 18, 19, 46…) all work; the first 10 hits of `downloads_asc` are all 0, which agrees with ascending order but is all ties. When a result set has more than 2000 hits the site offers no sorting (「人工智慧」, 7,190 hits, once showed no effect for that reason) and the output says so.
+- Abstracts: by thesis ID, by query + serial number (theses without an ID), with table of contents and references; APA citation.
+- Member export (login required): bibliography + both abstracts + table of contents + references came back as real content; ticking and clearing, no `cache=`, and the stop behaviour.
+- Match modes: `synonym` for 「人工智慧」 gave more hits than `exact` (11,057 vs 7,190), the extra ones including unrelated theses; `homophone` for the advisor 「蔡炎龍」 equals `exact` (65 hits), tried once. So no non-exact mode is recommended as a default.
+- Bridge: extension long-polling, captcha typed by the user, and after the keep-alive the first request after 10 idle minutes took about 5 seconds.
 
-**離線測試**：114 個（假站台、假擴充功能、解析器、引用格式、橋接口安全檢查）。RIS／BibTeX 另用 `rispy`、`bibtexparser` 實際解析過（`tests/test_formats.py`，開發依賴，未安裝時自動略過）。
+**Offline tests**: 114 (fake site, fake extension, parsers, citation formats, bridge security checks). RIS / BibTeX were additionally parsed with `rispy` and `bibtexparser` (`tests/test_formats.py`; development dependencies, skipped when not installed).
 
-**沒有驗證、或只有粗略觀察**
+**Not verified, or only roughly observed**
 
-- session 有效期沒有量過：同一個登入 session 撐過數小時，隔夜失效（粗略觀察）。失效時工具會請你重新輸入驗證碼。
-- RIS／BibTeX 沒有實際匯入 Zotero／EndNote。
-- `relevance_asc`、`author_desc`、`title_desc`、`school_desc` 沒試過。
-- 會員匯出：站方若在缺項（缺目次、缺外文摘要）時省略區塊，內容可能錯位；只有輕量偵測，沒有實測過這種論文。
-- Firefox：設定檔相容，但沒有完整驗證。
-- 純 HTTP 模式（`NDLTD_MODE=http`）：站方目前會擋（空白頁）；它的驗證碼表單欄位也沒有用真實頁面驗證過。瀏覽器橋接模式不需要這兩者。
+- Session lifetime was not measured: one logged-in session lasted several hours and was gone overnight (rough observation). When it expires the tool asks you to type the captcha again.
+- RIS / BibTeX were not actually imported into Zotero / EndNote.
+- `relevance_asc`, `author_desc`, `title_desc` and `school_desc` were not tried.
+- Member export: if the site leaves a block out when a thesis lacks a table of contents or a foreign-language abstract, content could be shifted; there is only a light check and no such thesis was tested.
+- Firefox: the manifest is compatible, but it was not fully verified.
+- Plain-HTTP mode (`NDLTD_MODE=http`): the site currently blocks it (blank page); its captcha form fields were not verified against a real page either. The browser-bridge mode needs neither.
