@@ -169,3 +169,7 @@ Do not refresh repeatedly and do not change IP. First check by hand in a browser
 - Member export: if the site leaves a block out when a thesis lacks a table of contents or a foreign-language abstract, content could be shifted; there is only a light check and no such thesis was tested.
 - Firefox: the manifest is compatible, but it was not fully verified.
 - Plain-HTTP mode (`NDLTD_MODE=http`): the site currently blocks it (blank page); its captcha form fields were not verified against a real page either. The browser-bridge mode needs neither.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The license covers this code only, not the content of the NDLTD site; see "Terms of use and your own risk" above.
