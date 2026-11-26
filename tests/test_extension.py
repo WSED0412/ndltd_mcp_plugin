@@ -24,8 +24,10 @@ const chrome = {
     onUpdated: { addListener: noop, removeListener: noop },
   },
   // stands in for the page: answers like pageJob would for the tab's URL
-  scripting: { executeScript: async ({ target, args }) => {
-    const tab = state.tabs.find((t) => t.id === target.tabId), job = args[0];
+  downloads: { onDeterminingFilename: { addListener: (f) => { state.onDownload = f; } } },
+  scripting: { executeScript: async ({ target, args, func }) => {
+    const tab = state.tabs.find((t) => t.id === target.tabId), job = args && args[0];
+    if (func && func.name === "pageMeta") return [{ result: tab.meta || { title: "", author: "" } }];
     const m = new URL(tab.url).pathname.match(/^(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+)(?:\/|$)/);
     state.ran.push([tab.id, job.path]);
     if (!m) return [{ result: { ok: false, kind: "nosession" } }];
@@ -121,3 +123,44 @@ def test_result_page_quoting_the_captcha_phrase_does_not_send_the_tab_home(tmp_p
         await runJob({{ path: "/search", cont: false }});
         return state.updated;""")
     assert got == [[1, "https://ndltd.ncl.edu.tw/"]]  # only the real captcha page did
+
+
+# ---------------------------------------------------------------- download renaming
+
+DL = """
+const suggestions = [];
+const dl = (item) => new Promise((ok) => { state.onDownload(item, (s) => { suggestions.push(s || null); ok(); }); });
+"""
+
+
+def test_download_name_is_title_underscore_author_and_filesystem_safe(tmp_path):
+    got = run(tmp_path, r"""return [
+        downloadName({ title: "大一學生微積分學習策略之研究", author: "楊嘉勝" }, "fb261117094629.pdf"),
+        downloadName({ title: 'A/B: "x"?*<>|', author: "甲、乙" }, "C:" + String.fromCharCode(92) + "x" + String.fromCharCode(92) + "f.PDF"),
+        downloadName({ title: "題目", author: "" }, "noext"),
+        downloadName({ title: "x".repeat(200), author: "y" }, "a.pdf").length,
+        downloadName({ title: "", author: "楊" }, "a.pdf"),
+        downloadName(null, "a.pdf"),
+    ];""")
+    assert got == ["大一學生微積分學習策略之研究_楊嘉勝.pdf", "A B x_甲、乙.pdf", "題目.pdf", 80 + 2 + 4, "", ""]
+
+
+def test_download_from_ndltd_is_renamed_from_the_record_page_being_viewed(tmp_path):
+    got = run(tmp_path, DL + f"""
+        state.tabs = {tabs((1, S.format("AAA")), (2, S.format("BBB")))};
+        state.tabs[0].meta = {{ title: "別篇", author: "別人" }};
+        state.tabs[1].meta = {{ title: "正在看的論文", author: "研究者" }};
+        await dl({{ url: "https://ndltd.ncl.edu.tw/x", referrer: "{S.format("BBB")}#top", filename: "fb261117094629.pdf" }});
+        return suggestions;""")
+    assert got == [{"filename": "正在看的論文_研究者.pdf", "conflictAction": "uniquify"}]
+
+
+def test_other_downloads_and_pages_without_a_record_keep_their_name(tmp_path):
+    got = run(tmp_path, DL + f"""
+        state.tabs = {tabs((1, S.format("AAA")))};
+        state.tabs[0].meta = {{ title: "不該用", author: "x" }};
+        await dl({{ url: "https://example.com/f.pdf", referrer: "https://example.com/", filename: "f.pdf" }});
+        state.tabs[0].meta = {{ title: "", author: "" }};  // a result list / home page: no 論文名稱 row
+        await dl({{ url: "https://ndltd.ncl.edu.tw/x", referrer: "", filename: "fb261117094629.pdf" }});
+        return suggestions;""")
+    assert got == [None, None]

@@ -90,6 +90,7 @@ Claude ──stdio──> ndltd-mcp ──127.0.0.1 long-poll──> browser ext
 
 - At least 3 seconds between requests; one page per call; **no automatic multi-page bulk harvesting** (deliberately not built, see below). The one batch exception is the member export above, which is off by default: it returns the abstracts of one page, at most 20 records.
 - No full-text download, no caching.
+- Download renaming (Chrome only): when you download a file from ndltd yourself, the extension renames it to `論文名稱_研究者.pdf`, reading the title and author from the record page you are viewing (no extra request to the site; if no record page is found, the original name is kept). Needs the extension's `downloads` permission, so press "Reload" on `chrome://extensions` after updating.
 - On a "Blank page" or a captcha it stops and does not retry.
 - Errors are reported separately: cannot connect / timeout, page structure does not match, rate-limited, captcha needed. Fields that cannot be parsed are written as 「（無）」 ("none") — nothing is guessed.
 

@@ -125,6 +125,84 @@ async function runJob(job) {
   return res;
 }
 
+// ---------------------------------------------------------------- download renaming
+// Files the user downloads from ndltd by hand arrive with a generated name (e.g. fb261117094629.pdf). Rename them to
+// 論文名稱_研究者.<ext>, reading the two fields from the record page the user is looking at. No request is sent to
+// the site: the download itself is the user's own, only its local filename changes.
+
+// Injected into a tab to read the record page's own table. Self-contained (serialized into the page).
+function pageMeta() {
+  const cell = (label) => {
+    for (const th of document.querySelectorAll("th.std1")) {
+      if (th.textContent.replace(/[:：\s]+$/, "").trim() !== label) continue;
+      const td = th.parentElement && th.parentElement.querySelector("td");
+      if (!td) return "";
+      return Array.from(td.querySelectorAll("a.slink")).map((a) => a.textContent.trim()).filter(Boolean).join("、")
+        || td.textContent.replace(/\s+/g, " ").trim();
+    }
+    return "";
+  };
+  return { title: cell("論文名稱"), author: cell("研究生") };
+}
+
+function cleanPart(s, max) {
+  s = (s || "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();
+  if (s.length > max) s = s.slice(0, max).trim();
+  return s.replace(/[. ]+$/, "");
+}
+
+// 論文名稱_研究者.ext ; "" when there is no title (then the original name is kept)
+function downloadName(meta, original) {
+  const title = cleanPart(meta && meta.title, 80);
+  if (!title) return "";
+  const author = cleanPart(meta && meta.author, 40);
+  const m = /\.([0-9A-Za-z]{1,8})$/.exec((original || "").split(/[\\/]/).pop());
+  return title + (author ? "_" + author : "") + "." + (m ? m[1].toLowerCase() : "pdf");
+}
+
+function isNdltdDownload(item) {
+  const hosts = [item.url, item.finalUrl, item.referrer].map((u) => {
+    try { return new URL(u).hostname; } catch (e) { return ""; }
+  });
+  if (hosts.some((h) => h === "ndltd.ncl.edu.tw")) return true;
+  return /^fb\d{12}\.\w+$/.test((item.filename || "").split(/[\\/]/).pop()); // the generated name seen in practice
+}
+
+const stripHash = (u) => (u || "").split("#")[0];
+
+async function metaForDownload(item) {
+  const tabs = await chrome.tabs.query({ url: "https://ndltd.ncl.edu.tw/*" });
+  const ref = stripHash(item.referrer);
+  const ordered = [
+    ...tabs.filter((t) => ref && stripHash(t.url) === ref),
+    ...tabs.filter((t) => t.id === lastTabId),
+    ...tabs.filter((t) => t.active),
+    ...tabs,
+  ].filter((t, i, a) => a.findIndex((x) => x.id === t.id) === i);
+  for (const t of ordered) {
+    try {
+      const out = await chrome.scripting.executeScript({ target: { tabId: t.id }, func: pageMeta });
+      const meta = out && out[0] && out[0].result;
+      if (meta && meta.title) return meta; // only a record page has a 論文名稱 row
+    } catch (e) { /* tab not scriptable: try the next */ }
+  }
+  return null;
+}
+
+if (chrome.downloads && chrome.downloads.onDeterminingFilename) { // not available on Firefox
+  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    (async () => {
+      try {
+        if (!isNdltdDownload(item)) return suggest();
+        const name = downloadName(await metaForDownload(item), item.filename);
+        if (!name) return suggest();
+        suggest({ filename: name, conflictAction: "uniquify" });
+      } catch (e) { suggest(); }
+    })();
+    return true; // suggest() is called asynchronously
+  });
+}
+
 async function loop() {
   if (running) return;
   running = true;
