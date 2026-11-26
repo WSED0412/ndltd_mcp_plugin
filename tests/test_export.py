@@ -285,3 +285,21 @@ async def test_tool_output_shows_the_alignment_note(export_server):
     export_server._client = make(site)
     out = await tool(export_server, query="微積分", max_records=1, confirm=True)
     assert "區塊對齊可疑" in out
+
+
+@pytest.mark.parametrize("numbers", [["", "2.", "3."], ["1.", "3.", "4."]])
+async def test_export_refuses_rows_whose_numbers_are_missing_or_not_consecutive(numbers):
+    class OddNumbers(ExportSite):
+        def __call__(self, req):
+            resp = super().__call__(req)
+            if req.method == "POST" and str(req.url).endswith("/search"):
+                html = resp.text
+                for want, shown in zip(("1.", "2.", "3."), numbers):
+                    html = html.replace(f'tdfmt1-second">{want}<', f'tdfmt1-second">{shown}<')
+                return httpx.Response(200, text=html)
+            return resp
+
+    site = OddNumbers(n=3)
+    with pytest.raises(ExportError, match="序號"):
+        await make(site).export_full("微積分", 1, ("ti", "kw"), "es0", "", 10)
+    assert not any("getchecker" in u for _, u in site.log)  # nothing was ticked or cleared

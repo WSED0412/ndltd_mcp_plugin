@@ -25,7 +25,7 @@ from urllib.parse import urlparse
 
 from . import parsers
 from .client import MIN_INTERVAL, ExportMixin, SessionApi
-from .errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdNetworkError
+from .errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdError, NdltdNetworkError
 
 DEFAULT_PORT = 8765
 POLL_SECONDS = 20.0  # shorter than the service worker's ~30 s idle limit
@@ -42,16 +42,32 @@ def token_path() -> Path:
 
 def load_or_create_token() -> str:
     p = token_path()
-    if p.exists() and p.read_text(encoding="utf-8").strip():
-        return p.read_text(encoding="utf-8").strip()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tok = secrets.token_urlsafe(24)
-    p.write_text(tok, encoding="utf-8")
+    try:
+        if p.exists() and p.read_text(encoding="utf-8").strip():
+            return p.read_text(encoding="utf-8").strip()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tok = secrets.token_urlsafe(24)
+        p.write_text(tok, encoding="utf-8")
+    except (OSError, UnicodeError) as e:  # reported by the tool call instead of killing the server at start-up
+        raise NdltdError(f"無法讀寫橋接 token 檔（{type(e).__name__}）：{p}。請檢查該資料夾的權限，或用環境變數 NDLTD_HOME 換位置。") from e
     try:
         os.chmod(p, 0o600)
     except OSError:
         pass
     return tok
+
+
+def bridge_port() -> int:
+    raw = os.environ.get("NDLTD_BRIDGE_PORT", "").strip()
+    if not raw:
+        return DEFAULT_PORT
+    try:
+        port = int(raw)
+    except ValueError:
+        port = -1
+    if not 0 <= port <= 65535:
+        raise NdltdError(f"環境變數 NDLTD_BRIDGE_PORT 必須是 0 到 65535 的整數，目前是 {raw!r}。")
+    return port
 
 
 class _Server(ThreadingHTTPServer):
@@ -123,6 +139,9 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
+            n = -1
+        if n < 0:  # read(-1) would wait for the client to hang up
+            self.close_connection = True
             return self._reply(400, {"error": "bad length"})
         if not self._authorized():
             # refuse without buffering the body; drain a little so the client sees the 403 instead of a reset
@@ -146,7 +165,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 class Bridge:
     def __init__(self, port: int | None = None, token: str | None = None):
-        self.port = port if port is not None else int(os.environ.get("NDLTD_BRIDGE_PORT", DEFAULT_PORT))
+        self.port = port if port is not None else bridge_port()
         self.token = token or load_or_create_token()
         self.jobs: queue.Queue[dict] = queue.Queue()
         self.pending: dict[str, concurrent.futures.Future] = {}
@@ -215,8 +234,11 @@ class BridgeClient(ExportMixin, SessionApi):
         self.bridge.stop()
 
     async def _session_request(self, method: str, path: str, content: bytes | None = None, headers=None) -> _Page:
+        # cont: this request reads the result set an earlier request of the same operation made (everything except
+        # a search, which makes a new one). The extension then insists on the same tab and session, because any
+        # other tab holds a different result set and would answer with a different thesis.
         job = {"method": method, "path": path, "body": content.decode() if content else None,
-               "form": bool(content)}
+               "form": bool(content), "cont": not path.startswith("/search")}
         async with self._lock:
             wait = self._min_interval - (time.monotonic() - self._last)
             if wait > 0:
@@ -231,6 +253,11 @@ class BridgeClient(ExportMixin, SessionApi):
                 raise NdltdCaptchaRequired(
                     "瀏覽器的 ndltd 分頁還沒有可用的 session。已把分頁帶到國圖首頁；若出現驗證碼，請你本人輸入，"
                     "進入搜尋頁後再呼叫一次。"
+                )
+            if kind == "tab_lost":
+                raise NdltdNetworkError(
+                    "這個操作進行到一半時，原本使用的 ndltd 分頁已關閉、離開了查詢頁或換了 session，後續的請求會對到"
+                    "別的搜尋結果，所以已中止。請確認瀏覽器有一個停在國圖查詢頁的分頁（出現驗證碼請本人輸入），再呼叫一次。"
                 )
             raise NdltdNetworkError(f"瀏覽器端失敗：{res.get('error') or kind or '未知'}")
         status, html = res.get("status"), res.get("html") or ""

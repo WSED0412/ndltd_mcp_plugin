@@ -144,3 +144,15 @@ def test_detail_only_reads_the_record_tab_group():
 def test_find_ccd_accepts_dots_and_underscores():
     assert parsers.find_ccd("/cgi-bin/gs32/gsweb.cgi/ccd=Jy2D._/search") == "Jy2D._"
     assert parsers.find_ccd("https://x/cgi-bin/gs32/gsweb.cgi/ccd=a-b~c.d_e?x=1") == "a-b~c.d_e"
+
+
+def test_page_kind_ignores_the_marker_phrases_inside_content_pages():
+    # a result list echoes the query and a record page shows the abstract: either may contain the phrases
+    for phrase in ("驗證碼檢查機制", "this is a Blank page"):
+        assert parsers.page_kind(load("search_one_result.html").replace("</body>", phrase + "</body>")) == "ok"
+        assert parsers.page_kind(load("detail_099NCTU5507087.html").replace("</body>", phrase + "</body>")) == "ok"
+        assert parsers.page_kind(f"<html><body>檢索結果共 0 筆 {phrase}</body></html>") == "ok"
+        assert parsers.page_kind(f'<table class="tableoutfmt2"><td>{phrase}</td></table>') == "ok"
+    # the real pages are still recognised
+    assert parsers.page_kind(load("blank_page.html")) == "blank"
+    assert parsers.page_kind("<title>x</title><form>驗證碼檢查機制<input name=validinput></form>") == "captcha"

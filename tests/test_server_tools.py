@@ -65,3 +65,27 @@ def test_importing_the_server_opens_no_port_and_writes_no_token(tmp_path):
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     subprocess.run([sys.executable, "-c", code], env=env, cwd=root, check=True, timeout=60)
     assert not (tmp_path / "token").exists()
+
+
+def test_a_bad_bridge_setting_does_not_stop_the_server_from_starting(monkeypatch):
+    monkeypatch.setattr(server, "_client", None)
+    monkeypatch.setenv("NDLTD_BRIDGE_PORT", "abc")
+    monkeypatch.delenv("NDLTD_MODE", raising=False)
+    server.start_bridge_early()  # no exception: the first tool call reports it instead
+    assert server._client is None
+
+
+async def test_a_bad_bridge_setting_is_reported_by_the_tool_call(monkeypatch):
+    monkeypatch.setattr(server, "_client", None)
+    monkeypatch.setenv("NDLTD_BRIDGE_PORT", "abc")
+    monkeypatch.delenv("NDLTD_MODE", raising=False)
+    assert "NDLTD_BRIDGE_PORT" in text(await call("ndltd_search", query="微積分"))
+
+
+async def test_hint_quotes_the_callers_own_arguments_safely(monkeypatch):
+    from test_features import NoIdSite
+    monkeypatch.setattr(server, "_client", make(NoIdSite()))
+    out = text(await call("ndltd_search", query="微積分", fields='title", x="1', compact=False))
+    assert "不認得的搜尋欄位" in out  # refused before any hint is built: a quote can never reach the hint unescaped
+    out = text(await call("ndltd_search", query="微積分", fields="Title , keyword", match="exact", sort="Year_Desc"))
+    assert 'fields="Title , keyword", match="exact", sort="Year_Desc"' in out

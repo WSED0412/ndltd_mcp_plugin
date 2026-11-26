@@ -37,6 +37,8 @@ async function pageJob(job) {
     const captcha = ((document.body && document.body.innerText) || "").includes("驗證碼檢查機制");
     return { ok: false, kind: captcha ? "captcha" : "nosession" };
   }
+  // a follow-up request must run under the session that holds the operation's result set
+  if (job.expect && m[1] !== job.expect) return { ok: false, kind: "tab_lost" };
   // no-store: identical URLs (e.g. the getchecker calls) must always reach the site, never the HTTP cache
   const init = { method: job.method, credentials: "include", cache: "no-store", headers: {} };
   if (job.body != null) {
@@ -46,14 +48,26 @@ async function pageJob(job) {
   try {
     const r = await fetch(m[1] + job.path, init);
     const html = await r.text();
-    return { ok: true, status: r.status, html };
+    return { ok: true, status: r.status, html, session: m[1] };
   } catch (e) {
     return { ok: false, kind: "fetch", error: String(e) };
   }
 }
 
 const SESSION_PATH = /\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+(\/|$)/;
-let lastTabId = null; // keep using the same tab for the chained requests of one operation
+// The chained requests of one operation (search -> jump -> record) must share a tab AND a session: the result set
+// lives in the session. Both are remembered from the last job that worked (lost when the worker is recycled).
+let lastTabId = null;
+let lastSession = null;
+
+// Mirrors page_kind() in src/ndltd_mcp/parsers.py: the captcha phrase only counts on a page that is not a result
+// list, a record page or an export preview (those echo the query and show abstracts, which may contain the phrase).
+function isCaptchaPage(html) {
+  if (!html.includes("驗證碼檢查機制")) return false;
+  const gap = "(?:\\s|&nbsp;|<[^>]*>)*";
+  if (new RegExp("檢索結果共" + gap + "[\\d,]+" + gap + "筆").test(html)) return false;
+  return !(html.includes("gs32_levelrecord") || html.includes("tableoutfmt2"));
+}
 
 function hasSession(tab) {
   try { return SESSION_PATH.test(new URL(tab.url).pathname); } catch (e) { return false; }
@@ -78,11 +92,16 @@ function pickTab(tabs) {
 
 async function runJob(job) {
   const tabs = await chrome.tabs.query({ url: "https://ndltd.ncl.edu.tw/*" });
-  if (!tabs.length) {
+  if (!tabs.length && !job.cont) {
     await chrome.tabs.create({ url: HOME, active: true });
     return { ok: false, kind: "nosession", error: "opened ndltd tab" };
   }
-  let tab = pickTab(tabs);
+  // A follow-up request (job.cont) goes to the tab its operation started in, or nowhere: another tab has another
+  // session and another result set. When nothing is remembered (worker just restarted) the usual choice applies.
+  const follow = job.cont && lastTabId !== null && lastSession !== null;
+  let tab = follow ? tabs.filter(hasSession).find((t) => t.id === lastTabId) : pickTab(tabs);
+  if (!tab) return { ok: false, kind: "tab_lost" };
+  if (follow) job = { ...job, expect: lastSession };
   await waitComplete(tab.id);
   tab = await chrome.tabs.get(tab.id);
   let res;
@@ -95,10 +114,11 @@ async function runJob(job) {
     res = { ok: false, kind: "script_error", error: String(e) };
   }
   if (!res) res = { ok: false, kind: "nosession", error: "no result from page" };
-  if (res.ok) lastTabId = tab.id;
+  if (res.ok) { lastTabId = tab.id; lastSession = res.session; }
+  delete res.session; // stays in the browser
   // A tab already on the entry/captcha flow is left alone (the human may be typing). A tab with no session that
   // is somewhere else, or one whose expired session answered with the captcha page, goes to the entry page once.
-  const expired = res.ok && res.html.includes("驗證碼檢查機制");
+  const expired = res.ok && isCaptchaPage(res.html);
   if ((res.kind === "nosession" && !isEntryPage(tab)) || expired) {
     await chrome.tabs.update(tab.id, { url: HOME, active: true });
   }

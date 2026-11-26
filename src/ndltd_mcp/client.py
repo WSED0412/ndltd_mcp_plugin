@@ -152,6 +152,10 @@ class ExportMixin:
             raise ExportError("結果頁沒有「完整書目」匯出選項：這個功能只提供給已登入的國圖會員，請先在瀏覽器登入。")
         rows = res.rows[: max(1, min(limit, MAX_EXPORT))]
         first, last = rows[0].index, rows[-1].index
+        # the rows are ticked as the range first-last, so they must really be that range (a row whose number
+        # could not be read parses as 0)
+        if first < 1 or [r.index for r in rows] != list(range(first, first + len(rows))):
+            raise ExportError("結果頁各筆的序號讀不出來或不連續，無法確定要勾選哪幾筆；已中止，沒有勾選任何紀錄。")
 
         async def checker(arg: str) -> int | None:
             # no cache=<ms> parameter (robots.txt disallows URLs containing it); the browser side fetches with

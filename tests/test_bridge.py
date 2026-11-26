@@ -6,7 +6,7 @@ import pytest
 
 from ndltd_mcp import parsers
 from ndltd_mcp.bridge import Bridge, BridgeClient
-from ndltd_mcp.errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdNetworkError
+from ndltd_mcp.errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdError, NdltdNetworkError
 from test_parsers import load
 
 TOKEN = "t0ken"
@@ -186,3 +186,45 @@ def test_non_ascii_token_is_refused_not_crashed(bridge):
     c.putheader("X-Ndltd-Token", "t0k\u00e9n".encode("latin-1"))
     c.endheaders()
     assert c.getresponse().status == 403
+
+
+def test_bad_content_length_is_refused_at_once(bridge):
+    for bad in ("-1", "abc"):
+        c = http.client.HTTPConnection("127.0.0.1", bridge.port, timeout=5)  # would time out if the server read on
+        c.putrequest("POST", "/result")
+        c.putheader("X-Ndltd-Token", TOKEN)
+        c.putheader("Content-Length", bad)
+        c.endheaders()
+        assert c.getresponse().status == 400
+
+
+@pytest.mark.parametrize("value", ["abc", "70000", "-5", "8765.5"])
+def test_bad_port_setting_is_a_clear_error(monkeypatch, value):
+    monkeypatch.setenv("NDLTD_BRIDGE_PORT", value)
+    with pytest.raises(NdltdError, match="NDLTD_BRIDGE_PORT"):
+        Bridge(token="x")
+
+
+def test_unusable_token_file_is_a_clear_error(monkeypatch, tmp_path):
+    (tmp_path / "token").mkdir()  # a directory where the file should be: it can be neither read nor written
+    monkeypatch.setenv("NDLTD_HOME", str(tmp_path))
+    with pytest.raises(NdltdError, match="token"):
+        Bridge(port=0)
+
+
+async def test_follow_up_requests_are_marked_so_the_extension_keeps_them_in_one_session(bridge):
+    c = BridgeClient(bridge, min_interval=0)
+    page = load("search_one_result.html").replace("共 1 筆", "共 500 筆")
+    t, seen = fake_extension(bridge, lambda job: {"ok": True, "status": 200, "html": page}, n=3)
+    await c.record_html("微積分", 1)
+    await c.detail_html("099NCTU5507087")
+    t.join(5)
+    assert [(j["path"].split("?")[0], j["cont"]) for j in seen] == [("/search", False), ("/record", True), ("/search", False)]
+
+
+async def test_lost_tab_is_reported(bridge):
+    c = BridgeClient(bridge, min_interval=0)
+    t, _ = fake_extension(bridge, lambda job: {"ok": False, "kind": "tab_lost"})
+    with pytest.raises(NdltdNetworkError, match="已中止"):
+        await c.search_html("x")
+    t.join(5)

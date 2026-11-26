@@ -205,9 +205,9 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
     res = parsers.parse_search(html)
     extra = ""
     if (fields, match) != (options.DEFAULT_FIELDS, options.DEFAULT_MATCH):
-        extra = f", fields=\"{fields}\", match=\"{match}\""
+        extra = f", fields={_lit(fields)}, match={_lit(match)}"
     if so:
-        extra += f", sort=\"{sort}\""
+        extra += f", sort={_lit(sort)}"
     if pp:
         extra += f", per_page={pp}"
     lines = [f"共 {res.total} 筆；第 {page} 頁（本頁 {len(res.rows)} 筆）｜{options.describe(f, m)}"
@@ -258,7 +258,7 @@ async def ndltd_cite(thesis_id: str = "", query: str = "", index: int = 0,
 
     Args:
         expected_title: 同 ndltd_abstract，用 query＋index 時建議帶上，篇名不符會報錯。
-        format: apa（APA 7，中文格式；只支援中文姓名與篇名）、bibtex（@mastersthesis／@phdthesis）、ris（TY - THES）。
+        format: apa（APA 7，中文格式；只支援中文姓名的作者，篇名可以是外文）、bibtex（@mastersthesis／@phdthesis）、ris（TY - THES）。
             BibTeX 與 RIS 可匯入 Zotero、Mendeley、EndNote。
     引用只用詳目頁已有的欄位，並以論文出版年（西元）為年份；請與原頁面核對。
     """
@@ -281,10 +281,10 @@ if EXPERIMENTAL_EXPORT:
         （選填目次、參考文獻），比逐篇呼叫 ndltd_abstract 省請求。
 
         會使用你的會員登入狀態；使用規範我們沒讀到，大量匯出是否允許不確定，請自行承擔風險、節制使用。
-        只在使用者明確要求時呼叫，不要自行批次翻頁。每次呼叫約 5 個請求（搜尋、清除勾選、勾選本頁、預覽、清除勾選）；指定 sort／per_page 或 page>1 時最多再多 2 個。
+        只在使用者明確要求時呼叫，不要自行批次翻頁。每次呼叫約 5 個請求（搜尋、清除勾選、勾選本頁、預覽、清除勾選）；指定 sort 或 page>1 時最多再多 2 個。
 
         Args:
-            query, page, fields, match, sort: 同 ndltd_search（取該頁結果）。
+            query, page, fields, match, sort: 同 ndltd_search（取該頁結果）。每頁筆數用站方預設，不能指定。
             max_records: 本次最多取幾筆，1–20（也受該頁筆數限制）。
             confirm: 必須明確傳 True，否則不會發出任何請求。
         """

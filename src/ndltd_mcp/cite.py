@@ -2,8 +2,9 @@
 
 APA 7 follows the database-thesis pattern, in Chinese-style punctuation:
     作者（年）。*論文名稱*〔碩士論文，校院名稱〕。臺灣博碩士論文知識加值系統。網址
-Chinese-named authors and titles only: a romanised author name ("Yang, Jia-Sheng") would need "Family, G.-S."
+Chinese-named authors only: a romanised author name ("Yang, Jia-Sheng") would need "Family, G.-S."
 conversion, which is error-prone, so APA is refused for those and BibTeX / RIS are offered instead.
+The title is used as it stands, whatever its language.
 The year is the publication year (西元) from 論文出版年, never the 民國 graduation year."""
 from __future__ import annotations
 

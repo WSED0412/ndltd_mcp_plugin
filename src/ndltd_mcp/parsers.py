@@ -15,11 +15,26 @@ HANDLE_RE = re.compile(r"hdl\.handle\.net/(11296/[0-9A-Za-z]+)")
 CCD_RE = re.compile(r"/ccd=([0-9A-Za-z._~-]+)(?:/|\?|$)")  # ids can contain . and _ (seen: Jy2D._)
 
 
+_CONTENT_MARKERS = ("gs32_levelrecord", "tableoutfmt2")  # the record page's tab group; the export preview's blocks
+
+
+def _is_content_page(html: str) -> bool:
+    """A result list, a record page or an export preview: pages that carry text which is not the site's own
+    (the query is echoed back, abstracts are shown), so a marker phrase inside them proves nothing."""
+    return result_total(html) is not None or any(m in html for m in _CONTENT_MARKERS)
+
+
 def page_kind(html: str) -> str:
-    """'blank' (site throttling), 'captcha' (human must solve it) or 'ok'."""
-    if "this is a Blank page" in html:
+    """'blank' (site throttling), 'captcha' (human must solve it) or 'ok'.
+    The two marker phrases only count on a page that is not a content page: searching for the phrase itself, or a
+    thesis whose abstract quotes it, must not be reported as a block or a captcha.
+    The same rule is mirrored in extension/background.js (isCaptchaPage)."""
+    blank, captcha = "this is a Blank page" in html, "驗證碼檢查機制" in html
+    if (blank or captcha) and _is_content_page(html):
+        return "ok"
+    if blank:
         return "blank"
-    if "驗證碼檢查機制" in html:
+    if captcha:
         return "captcha"
     return "ok"
 
