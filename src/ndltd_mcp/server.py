@@ -43,9 +43,10 @@ def get_client():
     return _client
 
 
-def _start_bridge_early() -> None:
+def start_bridge_early() -> None:
     """Listen as soon as the server starts so the extension is already connected at the first call.
-    A busy port is not fatal here (e.g. a second Claude session); the first request reports it."""
+    A busy port is not fatal here (e.g. a second Claude session); the first request reports it.
+    Called by the entry point, never at import: importing this module must not open a port or write the token file."""
     if os.environ.get("NDLTD_MODE") == "http":
         return
     try:
@@ -53,8 +54,6 @@ def _start_bridge_early() -> None:
     except NdltdError:
         pass
 
-
-_start_bridge_early()
 
 
 def _tool(fn):
@@ -213,7 +212,7 @@ async def ndltd_search(query: str, page: int = 1, fields: str = options.DEFAULT_
         extra += f", per_page={pp}"
     lines = [f"共 {res.total} 筆；第 {page} 頁（本頁 {len(res.rows)} 筆）｜{options.describe(f, m)}"
              + (f"｜排序：{sort}" if so else "") + _size_note(pp, parsers.current_page_size(html), res.total)]
-    if so and parsers.current_sort(html) != so:
+    if so and res.total > 0 and parsers.current_sort(html) != so:  # a page with no hits has no sort control at all
         lines.append(
             f"注意：排序沒有套用，下列是站方預設順序。站方在結果超過 2000 筆時不提供排序（這次共 {res.total} 筆）；"
             "請加更多關鍵詞或換搜尋欄位縮小範圍後再排序。"

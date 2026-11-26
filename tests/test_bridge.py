@@ -49,6 +49,7 @@ def test_security_checks(bridge):
     assert http_call(bridge, "GET", "/poll", headers={"X-Ndltd-Token": "wrong"})[0] == 403
     assert http_call(bridge, "GET", "/poll", headers={"Host": "evil.example:80"})[0] == 403
     assert http_call(bridge, "GET", "/poll", headers={"Origin": "https://evil.example"})[0] == 403
+    assert http_call(bridge, "GET", "/poll", headers={"Origin": "https://chrome-extension.evil.example"})[0] == 403
     assert http_call(bridge, "OPTIONS", "/poll")[0] == 403
     assert http_call(bridge, "POST", "/result", body="{}", headers={"X-Ndltd-Token": ""})[0] == 403
     assert http_call(bridge, "POST", "/result", body="not json")[0] == 400
@@ -170,3 +171,18 @@ def test_a_second_bridge_on_the_same_port_fails_loudly(bridge):
     other = Bridge(port=bridge.port, token="x")
     with pytest.raises(NdltdNetworkError, match="橋接口"):
         other.start()
+
+
+@pytest.mark.parametrize("origin", ["chrome-extension://abcdefghijklmnop", "moz-extension://0f0e0d0c-1234-5678-9abc-def012345678"])
+def test_extension_origins_are_accepted(bridge, origin):
+    # Firefox sends moz-extension://<uuid>; both browsers' extensions must get past the Origin check
+    assert http_call(bridge, "POST", "/result", body="{}", headers={"Origin": origin})[0] == 400  # authorised, bad job
+
+
+def test_non_ascii_token_is_refused_not_crashed(bridge):
+    # http.client.request() would refuse such a header itself, so the raw bytes are written
+    c = http.client.HTTPConnection("127.0.0.1", bridge.port, timeout=5)
+    c.putrequest("GET", "/poll")
+    c.putheader("X-Ndltd-Token", "t0k\u00e9n".encode("latin-1"))
+    c.endheaders()
+    assert c.getresponse().status == 403

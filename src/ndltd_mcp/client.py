@@ -42,7 +42,19 @@ async def human_solver(image: bytes, content_type: str) -> str | None:
 
 class SessionApi:
     """High-level operations on top of `_session_request(method, path, content=None, headers=None) -> .text`.
-    Shared by the plain-HTTP client and the browser-bridge client."""
+    Shared by the plain-HTTP client and the browser-bridge client.
+
+    The site keeps ONE result set per session, and every search (a lookup by thesis id is one too) overwrites it.
+    A public operation is several requests that depend on that result set (search -> jump -> record), so each one
+    holds `_op()` from its first request to its last: tool calls arrive concurrently, and without this a second
+    call's search would land between the steps of the first and the first would read the wrong thesis. The
+    per-request lock of the concrete clients only spaces requests out; it does not give this."""
+
+    def _op(self) -> asyncio.Lock:
+        lock = self.__dict__.get("_op_lock")
+        if lock is None:
+            lock = self.__dict__["_op_lock"] = asyncio.Lock()
+        return lock
 
     async def _search(self, query: str, fields, match: str, sort: str, per_page: int):
         """The search itself, then at most ONE more post of the result form to apply sort and/or page size (the
@@ -80,6 +92,11 @@ class SessionApi:
                           match: str = "es0", sort: str = "", per_page: int = 0) -> str:
         """Fresh search every call (result sets are per-session and get overwritten), then jump to `page`.
         per_page 0 = whatever the site shows by default (20 for guests, 10 seen for members)."""
+        async with self._op():
+            return await self._search_page(query, page, fields, match, sort, per_page)
+
+    async def _search_page(self, query: str, page: int, fields, match: str, sort: str, per_page: int) -> str:
+        """search_html without the operation lock, for callers that already hold it."""
         resp = await self._search(query, fields, match, sort, per_page)
         if page > 1 and parsers.result_total(resp.text) != 0:
             resp = await self._jump(resp, page, per_page)
@@ -87,7 +104,8 @@ class SessionApi:
 
     async def detail_html(self, thesis_id: str) -> str:
         path = f"/search?s=id={quote(chr(34) + thesis_id + chr(34))}.&searchmode=basic"
-        return (await self._session_request("GET", path)).text
+        async with self._op():
+            return (await self._session_request("GET", path)).text
 
     async def record_html(self, query: str, index: int, fields: tuple[str, ...] = ("ti", "kw"),
                           match: str = "es0", sort: str = "", per_page: int = 0) -> str:
@@ -95,16 +113,17 @@ class SessionApi:
         entry carries no thesis id. Result sets are per-session and overwritten by any other query, so the
         search is repeated right before the lookup, and the page that holds `index` is opened first. The page
         size is read from the page itself (it differs between guests and members), not assumed."""
-        resp = await self._search(query, fields, match, sort, per_page)
-        total = parsers.result_total(resp.text)
-        if index < 1 or (total is not None and index > total):
-            raise NdltdError(f"搜尋「{query}」共 {total if total is not None else '?'} 筆，沒有第 {index} 筆。")
-        if total != 0:
-            size = int(parsers.result_form_fields(resp.text).get("jpsize") or PAGE_SIZE)
-            page = (index - 1) // size + 1
-            if page > 1:
-                await self._jump(resp, page, per_page)
-        return (await self._session_request("GET", f"/record?r1={index}&h1=1")).text
+        async with self._op():
+            resp = await self._search(query, fields, match, sort, per_page)
+            total = parsers.result_total(resp.text)
+            if index < 1 or (total is not None and index > total):
+                raise NdltdError(f"搜尋「{query}」共 {total if total is not None else '?'} 筆，沒有第 {index} 筆。")
+            if total != 0:
+                size = int(parsers.result_form_fields(resp.text).get("jpsize") or PAGE_SIZE)
+                page = (index - 1) // size + 1
+                if page > 1:
+                    await self._jump(resp, page, per_page)
+            return (await self._session_request("GET", f"/record?r1={index}&h1=1")).text
 
 
 MAX_EXPORT = 20  # records per experimental export call
@@ -119,8 +138,13 @@ class ExportMixin:
         """EXPERIMENTAL, members only: the page's own '完整書目' export of one result page.
         Requests: the search (plus sort / page jump), clear ticks, tick this page's rows, preview, clear ticks.
         Ticks live in the session and survive new searches, so they are cleared first and last; the tick count
-        reported by the site is checked before the preview is fetched."""
-        html = await self.search_html(query, page, fields=fields, match=match, sort=sort)
+        reported by the site is checked before the preview is fetched.
+        The whole sequence holds the operation lock (see SessionApi): the ticks are positions in the result set."""
+        async with self._op():
+            return await self._export_full(query, page, fields, match, sort, limit)
+
+    async def _export_full(self, query: str, page: int, fields, match: str, sort: str, limit: int):
+        html = await self._search_page(query, page, fields, match, sort, 0)
         res = parsers.parse_search(html)
         if not res.rows:
             return res, []
@@ -247,11 +271,12 @@ class NdltdClient(ExportMixin, SessionApi):
     async def _session_request(self, method: str, path: str, **kw) -> httpx.Response:
         """Request `path` under the current session. A captcha gives a *new* session, so after one the
         request is built again with the new ccd (at most once; no retry loops)."""
-        for attempt in range(2):
-            before = self.ccd
+        used = None  # the ccd the previous attempt was sent under
+        for _ in range(2):
             ccd = await self._ensure_session()
-            if attempt == 1 and ccd == before:
+            if ccd == used:  # the captcha did not give a new session: sending the same request again is pointless
                 break
+            used = ccd
             resp = await self._raw(method, f"{CGI}/ccd={ccd}{path}", **kw)
             if parsers.page_kind(resp.text) == "ok":
                 self._adopt(resp)

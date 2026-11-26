@@ -1,13 +1,14 @@
 import asyncio
 import urllib.request
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
 
 from ndltd_mcp import parsers
 from ndltd_mcp.captcha import HumanCaptchaServer, parse_captcha_page
-from ndltd_mcp.client import NdltdClient
-from ndltd_mcp.errors import NdltdBlockedError, NdltdCaptchaRequired
+from ndltd_mcp.client import NdltdClient, SessionApi
+from ndltd_mcp.errors import NdltdBlockedError, NdltdCaptchaRequired, NdltdError, NdltdNetworkError
 from test_parsers import load
 
 CAPTCHA_HTML = """<html><title>t</title><body>驗證碼檢查機制
@@ -173,3 +174,91 @@ async def test_record_html_page_one_has_no_jump():
     site = FakeSite()
     await make(site).record_html("微積分", 12)
     assert not any(u.endswith("/result") for _, u in site.log)
+
+
+async def test_captcha_in_the_middle_of_a_session_rebuilds_the_request():
+    class ExpiringSite(FakeSite):
+        expired = False
+
+        def __call__(self, req):
+            if "/ccd=ABC999/search?s=id" in str(req.url) and not self.expired:
+                self.expired = True
+                self.log.append((req.method, str(req.url)))
+                return httpx.Response(200, text=CAPTCHA_HTML)
+            return super().__call__(req)
+
+    async def solver(img, ct):
+        return "good"
+
+    site = ExpiringSite()
+    c = make(site, solver)
+    html = await c.detail_html("099NCTU5507087")
+    assert parsers.parse_detail(html).get("研究生") == "楊嘉勝"
+    assert c.ccd == "NEW123"
+    assert "/ccd=NEW123/search?s=id" in site.log[-1][1]  # sent again under the session the captcha gave
+    assert sum("/search?s=id" in u for _, u in site.log) == 2  # the expired attempt and one retry, no more
+
+
+async def test_captcha_that_gives_no_new_session_stops_after_one_attempt():
+    class StuckSite(FakeSite):
+        def __call__(self, req):
+            u = str(req.url)
+            if "validinput=" in u:  # the captcha is accepted but hands back the same session
+                self.log.append((req.method, u))
+                return httpx.Response(200, text="<html>ok /cgi-bin/gs32/gsweb.cgi/ccd=ABC999/search</html>")
+            if "/search?s=id" in u:
+                self.log.append((req.method, u))
+                return httpx.Response(200, text=CAPTCHA_HTML)
+            return super().__call__(req)
+
+    async def solver(img, ct):
+        return "good"
+
+    site = StuckSite()
+    with pytest.raises(NdltdNetworkError):
+        await make(site, solver).detail_html("099NCTU5507087")
+    assert sum("/search?s=id" in u for _, u in site.log) == 1
+
+
+class OneResultSetSite(SessionApi):
+    """Like the real site: one result set per session, overwritten by every search (a lookup by id is one too).
+    Requests are serialised one at a time, as the real clients do; that alone does not keep operations apart."""
+
+    def __init__(self):
+        self.current = None
+        self.log = []
+        self._req = asyncio.Lock()
+
+    async def _session_request(self, method, path, content=None, headers=None):
+        async with self._req:
+            await asyncio.sleep(0)  # let the other operations run if nothing holds them back
+            if path == "/search":
+                self.current = parse_qs(content.decode())["qs0"][0]
+            elif path.startswith("/search?s=id"):
+                self.current = "by-id"
+            self.log.append((self.current, path.split("?")[0]))
+            form = '<form action="x/result"><input name="jpsize" value="20"></form>'
+            return httpx.Response(200, text=f"檢索結果共 50 筆{form}<p>result set: {self.current}</p>")
+
+
+async def test_concurrent_record_lookups_do_not_read_each_others_result_set():
+    site = OneResultSetSite()
+    a, b = await asyncio.gather(site.record_html("AAA", 1), site.record_html("BBB", 1))
+    assert "result set: AAA" in a and "result set: BBB" in b
+
+
+async def test_concurrent_operations_never_interleave_their_requests():
+    site = OneResultSetSite()
+    await asyncio.gather(site.search_html("AAA", page=2), site.record_html("BBB", 30),
+                         site.detail_html("099NCTU5507087"), site.search_html("CCC", page=3))
+    # every operation's requests are consecutive: the result set changes only where a new operation starts
+    owners = [q for q, _ in site.log]
+    assert owners == sorted(owners, key=owners.index)
+    assert [p for q, p in site.log if q == "BBB"] == ["/search", "/result", "/record"]
+
+
+async def test_a_failed_operation_releases_the_operation_lock():
+    site = OneResultSetSite()
+    with pytest.raises(NdltdError):
+        await site.record_html("AAA", 999)  # beyond the 50 hits
+    assert "result set: BBB" in await asyncio.wait_for(site.record_html("BBB", 1), 5)

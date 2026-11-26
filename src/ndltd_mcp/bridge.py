@@ -6,7 +6,8 @@ the response HTML back. The HTML stays inside this process; only parsed bibliogr
 
 Security: binds 127.0.0.1 only; requires header X-Ndltd-Token (a random secret kept in
 ~/.ndltd_mcp/token, pasted once into the extension's options); rejects any Host other than 127.0.0.1/localhost
-(DNS rebinding) and any Origin that is not a chrome-extension:// one; no CORS headers are ever sent.
+(DNS rebinding) and any Origin that is not a browser-extension one
+(chrome-extension:// or moz-extension://); no CORS headers are ever sent.
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ POLL_SECONDS = 20.0  # shorter than the service worker's ~30 s idle limit
 JOB_TIMEOUT = 90.0
 MAX_BODY = 4 * 1024 * 1024
 UNAUTH_DRAIN = 64 * 1024  # read at most this much of an unauthorised body
+EXTENSION_ORIGINS = ("chrome-extension://", "moz-extension://")  # Chrome / Firefox; a web page cannot have either
 EXT_ALIVE_WITHIN = 70.0  # the extension polls every <= 25 s; longer silence means it is not connected
 
 
@@ -81,9 +83,12 @@ class _Handler(BaseHTTPRequestHandler):
         if host not in ("127.0.0.1", "localhost"):
             return False
         origin = self.headers.get("Origin")
-        if origin and not origin.startswith("chrome-extension://"):
+        if origin and not origin.startswith(EXTENSION_ORIGINS):
             return False
-        return secrets.compare_digest(self.headers.get("X-Ndltd-Token") or "", b.token)
+        # bytes, not str: compare_digest raises TypeError on a str with non-ASCII characters, and header values
+        # are whatever the client sent (decoded as latin-1), so a stray byte would kill the handler instead of a 403
+        given = (self.headers.get("X-Ndltd-Token") or "").encode("latin-1", "replace")
+        return secrets.compare_digest(given, b.token.encode("utf-8"))
 
     def do_OPTIONS(self):  # no CORS: a preflight from any web page is refused
         self._reply(403, {"error": "forbidden"})
