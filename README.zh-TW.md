@@ -36,7 +36,7 @@
 ndltd_abstract(query="微積分", index=1, sort="cited_desc", per_page=20, expected_title="台灣地區大學生微積分學習態度的研究")
 ```
 
-**讀有編號的那篇，並附目次與參考文獻**：`ndltd_abstract(thesis_id="102NCU05479004", include_toc=True)`
+**讀有編號的那篇，並附目次與參考文獻**：`ndltd_abstract(thesis_id="102NCU05479004", include_toc=True, include_references=True)`
 
 **引用**：`ndltd_cite(thesis_id="113NCCU5507018", format="apa")`
 
