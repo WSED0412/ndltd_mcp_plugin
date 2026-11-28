@@ -164,3 +164,43 @@ def test_other_downloads_and_pages_without_a_record_keep_their_name(tmp_path):
         await dl({{ url: "https://ndltd.ncl.edu.tw/x", referrer: "", filename: "fb261117094629.pdf" }});
         return suggestions;""")
     assert got == [None, None]
+
+
+# ---------------------------------------------------------------- the page job itself (session id from the page)
+
+PAGE_JOB = """
+const page = (path, refs, text) => {
+  globalThis.location = { pathname: path };
+  globalThis.document = {
+    body: { innerText: text || "" },
+    querySelectorAll: () => refs.map((r) => ({ getAttribute: (n) => (n === "action" ? r : null) })),
+  };
+};
+globalThis.fetch = async (u) => ({ status: 200, text: async () => "fetched " + u });
+"""
+
+
+def test_page_job_takes_the_session_id_from_the_page_when_the_url_has_none(tmp_path):
+    # after the captcha the site shows the search page at gsweb.cgi?...&check=確定, with ccd= only in its forms/links
+    got = run(tmp_path, PAGE_JOB + """
+        const out = [];
+        page("/cgi-bin/gs32/gsweb.cgi", ["/cgi-bin/gs32/gsweb.cgi/ccd=Zy61c8/search", "https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/ccd=Zy61c8/?o=x"]);
+        out.push(await pageJob({ method: "GET", path: "/record?r1=1" }));
+        page("/cgi-bin/gs32/gsweb.cgi", ["/cgi-bin/gs32/gsweb.cgi/ccd=AAA/search", "/cgi-bin/gs32/gsweb.cgi/ccd=BBB/x"]);
+        out.push((await pageJob({ method: "GET", path: "/x" })).kind);  // two ids: do not guess
+        page("/cgi-bin/gs32/gsweb.cgi/login", ["/cgi-bin/gs32/gsweb.cgi/ccd=AAA/x"], "驗證碼檢查機制");
+        out.push((await pageJob({ method: "GET", path: "/x" })).kind);  // the captcha page is still a captcha
+        page("/cgi-bin/gs32/gsweb.cgi", []);
+        out.push((await pageJob({ method: "GET", path: "/x", expect: "/cgi-bin/gs32/gsweb.cgi/ccd=AAA" })).kind);
+        return out;""")
+    assert got[0] == {"ok": True, "status": 200, "html": "fetched /cgi-bin/gs32/gsweb.cgi/ccd=Zy61c8/record?r1=1",
+                      "session": "/cgi-bin/gs32/gsweb.cgi/ccd=Zy61c8"}
+    assert got[1:] == ["nosession", "captcha", "tab_lost"]
+
+
+def test_a_site_page_without_ccd_in_its_url_is_used_not_sent_home(tmp_path):
+    got = run(tmp_path, f"""
+        state.tabs = {tabs((1, "https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi?randomimg=x&check=1"))};
+        await runJob({{ path: "/search", cont: false }});
+        return [state.ran, state.created];""")
+    assert got == [[[1, "/search"]], []]  # the job went to that tab; nothing new was opened

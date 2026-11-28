@@ -122,8 +122,12 @@ class SessionApi:
                 size = int(parsers.result_form_fields(resp.text).get("jpsize") or PAGE_SIZE)
                 page = (index - 1) // size + 1
                 if page > 1:
-                    await self._jump(resp, page, per_page)
-            return (await self._session_request("GET", f"/record?r1={index}&h1=1")).text
+                    resp = await self._jump(resp, page, per_page)
+            # h1 = which search of this session to read from: the one just made, as its own record links say
+            h1 = parsers.history_number(resp.text)
+            if h1 is None:
+                raise NdltdError(f"搜尋「{query}」的結果頁找不到檢索編號，無法安全地讀第 {index} 筆；請改用論文編號。")
+            return (await self._session_request("GET", f"/record?r1={index}&h1={h1}")).text
 
 
 MAX_EXPORT = 20  # records per experimental export call

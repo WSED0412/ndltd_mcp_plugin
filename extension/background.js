@@ -32,13 +32,25 @@ function waitComplete(tabId, ms = 15000) {
 // site is untouched). Must be self-contained: it is serialized into the page. Runs a same-origin fetch under
 // the tab's own session (the ccd=XXXX path segment), exactly like the page's own forms. Never reads images.
 async function pageJob(job) {
-  const m = location.pathname.match(/^(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+)(?:\/|$)/);
-  if (!m) {
+  const RE = /^(?:https:\/\/ndltd\.ncl\.edu\.tw)?(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+)(?:[\/?#]|$)/;
+  let base = (location.pathname.match(RE) || [])[1];
+  if (!base) {
     const captcha = ((document.body && document.body.innerText) || "").includes("驗證碼檢查機制");
-    return { ok: false, kind: captcha ? "captcha" : "nosession" };
+    if (!captcha) {
+      // After the captcha (and some redirects) the site serves a working page at a URL without ccd= (seen
+      // 2026-11-28: the search page at gsweb.cgi?...&check=確定). Its own forms and links still carry the session
+      // id, so use that when they all name the same one.
+      const ids = new Set();
+      for (const el of document.querySelectorAll("form[action], a[href]")) {
+        const m = (el.getAttribute("action") || el.getAttribute("href") || "").match(RE);
+        if (m) ids.add(m[1]);
+      }
+      if (ids.size === 1) base = ids.values().next().value;
+    }
+    if (!base) return { ok: false, kind: job.expect ? "tab_lost" : captcha ? "captcha" : "nosession" };
   }
   // a follow-up request must run under the session that holds the operation's result set
-  if (job.expect && m[1] !== job.expect) return { ok: false, kind: "tab_lost" };
+  if (job.expect && base !== job.expect) return { ok: false, kind: "tab_lost" };
   // no-store: identical URLs (e.g. the getchecker calls) must always reach the site, never the HTTP cache
   const init = { method: job.method, credentials: "include", cache: "no-store", headers: {} };
   if (job.body != null) {
@@ -46,9 +58,9 @@ async function pageJob(job) {
     init.headers["Content-Type"] = "application/x-www-form-urlencoded";
   }
   try {
-    const r = await fetch(m[1] + job.path, init);
+    const r = await fetch(base + job.path, init);
     const html = await r.text();
-    return { ok: true, status: r.status, html, session: m[1] };
+    return { ok: true, status: r.status, html, session: base };
   } catch (e) {
     return { ok: false, kind: "fetch", error: String(e) };
   }
@@ -73,6 +85,11 @@ function hasSession(tab) {
   try { return SESSION_PATH.test(new URL(tab.url).pathname); } catch (e) { return false; }
 }
 
+function isSitePage(tab) {
+  // a page of the site's program whose URL lost the ccd= (e.g. right after the captcha): pageJob reads the id from it
+  try { return new URL(tab.url).pathname.startsWith("/cgi-bin/gs32/gsweb.cgi"); } catch (e) { return false; }
+}
+
 function isEntryPage(tab) {
   // the home page, or the login/captcha flow: the human is on their way in, do not interrupt
   try { const p = new URL(tab.url).pathname; return p === "/" || p.includes("/login"); } catch (e) { return false; }
@@ -84,6 +101,8 @@ function pickTab(tabs) {
     withSession.find((t) => t.id === lastTabId) ||
     withSession.find((t) => t.active) ||
     withSession[0] ||
+    tabs.find((t) => isSitePage(t) && !isEntryPage(t) && t.active) ||
+    tabs.find((t) => isSitePage(t) && !isEntryPage(t)) ||
     tabs.find(isEntryPage) ||
     tabs.find((t) => t.active) ||
     tabs[0]
@@ -94,12 +113,13 @@ async function runJob(job) {
   const tabs = await chrome.tabs.query({ url: "https://ndltd.ncl.edu.tw/*" });
   if (!tabs.length && !job.cont) {
     await chrome.tabs.create({ url: HOME, active: true });
-    return { ok: false, kind: "nosession", error: "opened ndltd tab" };
+    return { ok: false, kind: "nosession", opened: true, error: "opened ndltd tab" };
   }
   // A follow-up request (job.cont) goes to the tab its operation started in, or nowhere: another tab has another
   // session and another result set. When nothing is remembered (worker just restarted) the usual choice applies.
   const follow = job.cont && lastTabId !== null && lastSession !== null;
-  let tab = follow ? tabs.filter(hasSession).find((t) => t.id === lastTabId) : pickTab(tabs);
+  const usable = (t) => hasSession(t) || (isSitePage(t) && !isEntryPage(t));  // pageJob checks the session id itself
+  let tab = follow ? tabs.filter(usable).find((t) => t.id === lastTabId) : pickTab(tabs);
   if (!tab) return { ok: false, kind: "tab_lost" };
   if (follow) job = { ...job, expect: lastSession };
   await waitComplete(tab.id);

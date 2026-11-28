@@ -156,3 +156,9 @@ def test_page_kind_ignores_the_marker_phrases_inside_content_pages():
     # the real pages are still recognised
     assert parsers.page_kind(load("blank_page.html")) == "blank"
     assert parsers.page_kind("<title>x</title><form>驗證碼檢查機制<input name=validinput></form>") == "captcha"
+
+
+def test_history_number_is_the_search_a_result_list_belongs_to():
+    page = '<a href="/x/record?r1=1&amp;h1=3">a</a><a href="/x/record?r1=2&h1=3">b</a><a href="/x/record?r1=1&h1=1">old</a>'
+    assert parsers.history_number(page) == 3
+    assert parsers.history_number("<p>no record links</p>") is None

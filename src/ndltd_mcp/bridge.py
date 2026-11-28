@@ -334,10 +334,13 @@ class BridgeClient(ExportMixin, SessionApi):
                 self._last = time.monotonic()
         if not res.get("ok"):
             kind = res.get("kind", "")
-            if kind in ("nosession", "captcha"):
+            if kind == "captcha":
+                raise NdltdCaptchaRequired("國圖分頁正顯示驗證碼頁。請你本人在該分頁輸入驗證碼，進入搜尋頁後再呼叫一次。")
+            if kind == "nosession":
+                where = "已開一個國圖分頁" if res.get("opened") else "已把國圖分頁帶到首頁"
                 raise NdltdCaptchaRequired(
-                    "瀏覽器的 ndltd 分頁還沒有可用的 session。已把分頁帶到國圖首頁；若出現驗證碼，請你本人輸入，"
-                    "進入搜尋頁後再呼叫一次。"
+                    f"瀏覽器還沒有可用的國圖 session（{where}）。請在該分頁進入搜尋頁（若出現驗證碼請本人輸入），"
+                    "再呼叫一次。"
                 )
             if kind == "tab_lost":
                 raise NdltdNetworkError(

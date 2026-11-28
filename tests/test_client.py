@@ -224,8 +224,9 @@ class OneResultSetSite(SessionApi):
     """Like the real site: one result set per session, overwritten by every search (a lookup by id is one too).
     Requests are serialised one at a time, as the real clients do; that alone does not keep operations apart."""
 
-    def __init__(self):
-        self.current = None
+    def __init__(self, earlier_searches=()):
+        self.history = list(earlier_searches)  # the site numbers a session's searches: h1=1, 2, 3, ...
+        self.current = self.history[-1] if self.history else None
         self.log = []
         self._req = asyncio.Lock()
 
@@ -234,11 +235,25 @@ class OneResultSetSite(SessionApi):
             await asyncio.sleep(0)  # let the other operations run if nothing holds them back
             if path == "/search":
                 self.current = parse_qs(content.decode())["qs0"][0]
+                self.history.append(self.current)
             elif path.startswith("/search?s=id"):
                 self.current = "by-id"
+                self.history.append(self.current)
             self.log.append((self.current, path.split("?")[0]))
+            if path.startswith("/record"):  # row r1 of search number h1, whichever search that was
+                shown = self.history[int(parse_qs(path.split("?", 1)[1])["h1"][0]) - 1]
+                return httpx.Response(200, text=f"<p>result set: {shown}</p>")
             form = '<form action="x/result"><input name="jpsize" value="20"></form>'
-            return httpx.Response(200, text=f"檢索結果共 50 筆{form}<p>result set: {self.current}</p>")
+            link = f'<a href="/x/record?r1=1&amp;h1={len(self.history)}">t</a>'
+            return httpx.Response(200, text=f"檢索結果共 50 筆{form}{link}<p>result set: {self.current}</p>")
+
+
+async def test_a_record_is_read_from_the_search_just_made_not_the_sessions_first():
+    # reported 2026-11-28: with h1=1 fixed, every query+index lookup read the session's FIRST search
+    site = OneResultSetSite(earlier_searches=["自傳式民族誌"])
+    assert "result set: 行動研究 網站建置" in await site.record_html("行動研究 網站建置", 1)
+    assert site.log[-1][1] == "/record"
+    assert "result set: 自我民族誌" in await site.record_html("自我民族誌", 25)  # on page 2: after a jump
 
 
 async def test_concurrent_record_lookups_do_not_read_each_others_result_set():

@@ -266,6 +266,19 @@ def current_page_size(html: str) -> int | None:
         return None
 
 
+_HISTORY_RE = re.compile(r"record\?r1=\d+&(?:amp;)?h1=(\d+)")
+
+
+def history_number(html: str) -> int | None:
+    """Which search of the session a result list belongs to: the h1= of its record links. The site numbers every
+    search of a session (1, 2, 3, ...) and /record?r1=N&h1=K reads row N of search K, so a record must be read with
+    the number of the search just made, never a fixed 1 (that is the session's FIRST search; measured 2026-11-28)."""
+    nums = _HISTORY_RE.findall(html)
+    if not nums:
+        return None
+    return int(max(set(nums), key=nums.count))
+
+
 def result_total(html: str) -> int | None:
     """The total in '檢索結果共 N 筆', or None when the page does not say (not a result page)."""
     gap = r"(?:\s|&nbsp;|<[^>]*>)*"  # the real page puts the number inside a <span> between 共 and 筆
