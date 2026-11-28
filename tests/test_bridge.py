@@ -237,7 +237,7 @@ def _ok(job):
 
 
 async def test_the_port_is_bound_by_the_first_job_and_released_when_idle():
-    b = Bridge(port=0, token=TOKEN, idle_release=0.3)
+    b = Bridge(port=0, token=TOKEN, idle_release=0.3, acquire_wait=3)
     b.start()  # only to learn a free port; release it again
     port = b.port
     b.stop()
@@ -260,7 +260,10 @@ async def test_the_port_is_bound_by_the_first_job_and_released_when_idle():
     res = await b.submit({"method": "GET", "path": "/x"}, timeout=5)
     assert res["ok"]
     assert b.listening and b.port == port
-    await asyncio.sleep(0.8)
+    for _ in range(60):
+        if not b.listening:
+            break
+        await asyncio.sleep(0.05)
     assert not b.listening  # released after the idle window
     b.stop()
 
@@ -307,7 +310,10 @@ def test_release_wakes_a_blocked_poll_and_another_process_can_bind_at_once():
     t = threading.Thread(target=poll, daemon=True)
     t.start()
     import time
-    time.sleep(0.3)  # the poll is now blocked in a handler thread
+    for _ in range(100):  # wait until the poll is blocked in a handler thread
+        if a.last_poll > 0:
+            break
+        time.sleep(0.02)
     a.stop()
     t.join(3)
     assert got.get("status") == 204  # returned at once instead of after POLL_SECONDS
@@ -315,3 +321,18 @@ def test_release_wakes_a_blocked_poll_and_another_process_can_bind_at_once():
     b.start()  # the same port is free for the next window, even right after a live connection on it
     assert http_call(b, "GET", "/poll", headers={"X-Ndltd-Token": "wrong"})[0] == 403
     b.stop()
+
+
+async def test_stopping_fails_waiting_jobs_at_once_and_none_runs_after_a_restart():
+    import asyncio
+    b = Bridge(port=0, token=TOKEN, idle_release=None)
+    b.start()
+    task = asyncio.ensure_future(b.submit({"method": "GET", "path": "/x"}, timeout=30))
+    for _ in range(100):
+        if b.pending:
+            break
+        await asyncio.sleep(0.01)
+    b.stop()
+    with pytest.raises(NdltdNetworkError, match="關閉"):
+        await asyncio.wait_for(task, 3)
+    assert b.jobs.empty() and not b.pending and b._busy == 0

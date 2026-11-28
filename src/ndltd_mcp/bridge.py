@@ -39,9 +39,10 @@ EXT_ALIVE_WITHIN = 70.0  # the extension polls every <= 25 s; longer silence mea
 # taken waits up to ACQUIRE_WAIT for the holder to let go; that must cover the holder's idle window plus one job of
 # its own, or a call made just after another window's call would fail. Tune the two together.
 IDLE_RELEASE = 15.0
-ACQUIRE_WAIT = IDLE_RELEASE + JOB_TIMEOUT
+ACQUIRE_WAIT = IDLE_RELEASE + JOB_TIMEOUT + 15.0  # + slack for the release itself and a slow multi-request call
 ACQUIRE_RETRY = 0.5
-_WAKE = "wake"  # queued on release: a poll blocked in this process returns at once, so the extension moves on
+SERVE_POLL = 0.05  # serve_forever's poll interval: stop() waits up to this long, so keep it short
+STOP_CHECK = 0.25  # how often a blocked /poll checks whether its server was stopped
 
 
 def token_path() -> Path:
@@ -79,10 +80,15 @@ def bridge_port() -> int:
 
 
 class _Server(ThreadingHTTPServer):
-    # The stdlib default (allow_reuse_address = True) lets a second process bind the same port on Windows, so a stale
-    # server and a new one would listen side by side and the extension could end up talking to the wrong one.
-    allow_reuse_address = False
+    # Windows: SO_REUSEADDR lets a second process bind the same port, so a stale server and a new one would listen side
+    # by side and the extension could end up talking to the wrong one; keep it off. Elsewhere it only allows binding
+    # over TIME_WAIT connections (needed to take the port over right after a release), never two listeners.
+    allow_reuse_address = os.name != "nt"
     daemon_threads = True
+
+    def __init__(self, *a, **kw):
+        self.stopped = threading.Event()  # set by Bridge.stop(); handler threads of this server then return
+        super().__init__(*a, **kw)
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -125,12 +131,19 @@ class _Handler(BaseHTTPRequestHandler):
             return self._reply(404, {"error": "not found"})
         b.last_poll = time.monotonic()
         deadline = time.monotonic() + POLL_SECONDS
+        stopped = self.server.stopped  # type: ignore[attr-defined]
         while True:
-            try:
-                job = b.jobs.get(timeout=max(0.0, deadline - time.monotonic()))
-            except queue.Empty:
+            job = None
+            if not stopped.is_set():
+                try:
+                    job = b.jobs.get(timeout=max(0.0, min(STOP_CHECK, deadline - time.monotonic())))
+                except queue.Empty:
+                    if time.monotonic() < deadline:
+                        continue
+            if job is not None and stopped.is_set():
+                b.jobs.put(job)  # this server was released meanwhile: leave the job to the one that is listening
                 job = None
-            if job is None or job.get(_WAKE):
+            if job is None:
                 b.last_poll = time.monotonic()
                 try:
                     return self._reply(204)
@@ -193,7 +206,6 @@ class Bridge:
         with self._lock:
             if self._httpd:
                 return
-            self._drop_wakes()  # a wake nobody was polling for would only bounce the next poll
             try:
                 self._httpd = _Server(("127.0.0.1", self.port), _Handler)
             except OSError as e:
@@ -204,27 +216,26 @@ class Bridge:
             self.port = self._httpd.server_address[1]  # port 0: keep the one we got, so a rebind reuses it
             self._httpd.owner = self  # type: ignore[attr-defined]
             self._httpd.daemon_threads = True
-            threading.Thread(target=self._httpd.serve_forever, daemon=True).start()
+            threading.Thread(target=self._httpd.serve_forever, args=(SERVE_POLL,), daemon=True).start()
 
     def stop(self) -> None:
         with self._lock:
-            if self._httpd:
-                self.jobs.put({_WAKE: True})  # release a poll blocked in a handler thread (its socket closes)
-                self._httpd.shutdown()
-                self._httpd.server_close()
-                self._httpd = None
-
-    def _drop_wakes(self) -> None:
-        keep = []
-        while True:
-            try:
-                j = self.jobs.get_nowait()
-            except queue.Empty:
-                break
-            if not j.get(_WAKE):
-                keep.append(j)
-        for j in keep:
-            self.jobs.put(j)
+            if not self._httpd:
+                return
+            self._httpd.stopped.set()  # type: ignore[attr-defined]  # blocked polls answer 204 and close
+            self._httpd.shutdown()
+            self._httpd.server_close()
+            self._httpd = None
+            # jobs still waiting can no longer be answered: fail them now instead of after JOB_TIMEOUT, and make sure
+            # none of them runs after a later start()
+            while True:
+                try:
+                    self.jobs.get_nowait()
+                except queue.Empty:
+                    break
+            for fut in list(self.pending.values()):
+                if not fut.done():
+                    fut.set_exception(NdltdNetworkError("橋接口已關閉，這個工作沒有送出。"))
 
     @property
     def listening(self) -> bool:
