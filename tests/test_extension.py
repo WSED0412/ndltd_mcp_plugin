@@ -20,19 +20,24 @@ const chrome = {
     query: async () => state.tabs,
     get: async (id) => state.tabs.find((t) => t.id === id),
     create: async (o) => { state.created.push(o.url); },
-    update: async (id, o) => { state.updated.push([id, o.url]); },
+    update: async (id, o) => { state.updated.push([id, o.url]); const t = state.tabs.find((x) => x.id === id); if (t) t.url = o.url; },
     onUpdated: { addListener: noop, removeListener: noop },
   },
-  // stands in for the page: answers like pageJob would for the tab's URL
   downloads: { onDeterminingFilename: { addListener: (f) => { state.onDownload = f; } } },
+  // runs the REAL pageJob against a stand-in page built from the tab: its URL, the session links on the page
+  // (tab.refs), its visible text (tab.text) and the site's answer to the job's fetch (tab.html)
   scripting: { executeScript: async ({ target, args, func }) => {
     const tab = state.tabs.find((t) => t.id === target.tabId), job = args && args[0];
     if (func && func.name === "pageMeta") return [{ result: tab.meta || { title: "", author: "" } }];
-    const m = new URL(tab.url).pathname.match(/^(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+)(?:\/|$)/);
     state.ran.push([tab.id, job.path]);
-    if (!m) return [{ result: { ok: false, kind: "nosession" } }];
-    if (job.expect && m[1] !== job.expect) return [{ result: { ok: false, kind: "tab_lost" } }];
-    return [{ result: { ok: true, status: 200, html: tab.html || "<p>ok</p>", session: m[1] } }];
+    ctx.location = { pathname: new URL(tab.url).pathname };  // pageJob runs inside the vm context
+    ctx.document = {
+      body: { innerText: tab.text || "" },
+      documentElement: { innerHTML: tab.text || "" },
+      querySelectorAll: () => (tab.refs || []).map((r) => ({ getAttribute: (n) => (n === "href" ? r : null) })),
+    };
+    ctx.fetch = async () => ({ status: 200, text: async () => tab.html || "<p>ok</p>" });
+    return [{ result: await func(job) }];
   } },
 };
 const ctx = vm.createContext({ chrome, state, URL, setTimeout, clearTimeout, setInterval, clearInterval, console, fetch: noop });
@@ -173,7 +178,8 @@ const page = (path, refs, text) => {
   globalThis.location = { pathname: path };
   globalThis.document = {
     body: { innerText: text || "" },
-    querySelectorAll: () => refs.map((r) => ({ getAttribute: (n) => (n === "action" ? r : null) })),
+    documentElement: { innerHTML: text || "" },
+    querySelectorAll: () => refs.map((r, i) => ({ getAttribute: (n) => (n === (i % 2 ? "href" : "action") ? r : null) })),
   };
 };
 globalThis.fetch = async (u) => ({ status: 200, text: async () => "fetched " + u });
@@ -198,9 +204,81 @@ def test_page_job_takes_the_session_id_from_the_page_when_the_url_has_none(tmp_p
     assert got[1:] == ["nosession", "captcha", "tab_lost"]
 
 
+AFTER_CAPTCHA = "https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi?randomimg=x&check=1"
+REFS = '["/cgi-bin/gs32/gsweb.cgi/ccd=Zy61c8/search", "https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/ccd=Zy61c8/x"]'
+
+
 def test_a_site_page_without_ccd_in_its_url_is_used_not_sent_home(tmp_path):
     got = run(tmp_path, f"""
-        state.tabs = {tabs((1, "https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi?randomimg=x&check=1"))};
-        await runJob({{ path: "/search", cont: false }});
-        return [state.ran, state.created];""")
-    assert got == [[[1, "/search"]], []]  # the job went to that tab; nothing new was opened
+        state.tabs = {tabs((1, AFTER_CAPTCHA))};
+        state.tabs[0].refs = {REFS};
+        const a = await runJob({{ path: "/search", cont: false }});
+        const b = await runJob({{ path: "/record?r1=1", cont: true }});  // the follow-up stays there too
+        return [a.ok, b.ok, state.ran, state.created, state.updated];""")
+    assert got == [True, True, [[1, "/search"], [1, "/record?r1=1"]], [], []]
+
+
+def test_an_expired_tab_is_dropped_for_the_working_one_without_ccd_in_its_url(tmp_path):
+    # tab 1 still shows ccd= in its URL but its session expired; tab 2 is where the human just passed the captcha
+    got = run(tmp_path, f"""
+        state.tabs = {tabs((1, S.format("OLD")), (2, AFTER_CAPTCHA))};
+        state.tabs[1].refs = {REFS};
+        state.tabs[0].html = "<form>驗證碼檢查機制</form>";
+        await runJob({{ path: "/search", cont: false }});   // tab 1 answers with the captcha page: sent home
+        const b = await runJob({{ path: "/search", cont: false }});
+        return [state.ran, state.updated, b.ok];""")
+    assert got == [[[1, "/search"], [2, "/search"]], [[1, "https://ndltd.ncl.edu.tw/"]], True]
+
+
+def test_a_working_tab_without_ccd_in_its_url_is_preferred_once_it_has_worked(tmp_path):
+    got = run(tmp_path, f"""
+        state.tabs = {tabs((2, AFTER_CAPTCHA))};
+        state.tabs[0].refs = {REFS};
+        await runJob({{ path: "/search", cont: false }});    // tab 2 works and is remembered
+        state.tabs = {tabs((1, S.format("OTHER")), (2, AFTER_CAPTCHA))};
+        state.tabs[1].refs = {REFS};
+        await runJob({{ path: "/search", cont: false }});    // a tab with ccd= in its URL appears: tab 2 is kept
+        return state.ran;""")
+    assert got == [[2, "/search"], [2, "/search"]]
+
+
+def test_an_entry_page_is_left_alone_and_said_so(tmp_path):
+    got = run(tmp_path, f"""
+        state.tabs = {tabs((1, "https://ndltd.ncl.edu.tw/cgi-bin/gs32/gsweb.cgi/login?o=dwebmge"))};
+        const a = await runJob({{ path: "/search", cont: false }});
+        state.tabs = {tabs((1, "https://ndltd.ncl.edu.tw/somewhere/else"))};
+        const b = await runJob({{ path: "/search", cont: false }});
+        return [a.kind, !!a.home, b.kind, !!b.home, state.updated];""")
+    assert got == ["nosession", False, "nosession", True, [[1, "https://ndltd.ncl.edu.tw/"]]]
+
+
+def test_a_blank_page_is_reported_and_the_tab_left_alone(tmp_path):
+    got = run(tmp_path, f"""
+        state.tabs = {tabs((1, AFTER_CAPTCHA))};
+        state.tabs[0].text = "<!-- this is a Blank page -->";
+        const a = await runJob({{ path: "/search", cont: false }});
+        return [a.kind, state.updated];""")
+    assert got == ["blank", []]
+
+
+def test_expired_page_detection_matches_the_python_rule(tmp_path):
+    from ndltd_mcp import parsers
+    pages = [(ROOT / "tests" / "fixtures" / "expired_session.html").read_text(encoding="utf-8"),
+             "檢索結果共<span>&nbsp;3&nbsp;</span>筆 <h1>Error</h1>", "<p>ok</p>"]
+    got = run(tmp_path, f"return {json.dumps(pages, ensure_ascii=False)}.map(isExpiredPage);")
+    assert got == [True, False, False]
+    assert got == [parsers.page_kind(p) == "expired" for p in pages]
+
+
+def test_a_tab_whose_session_expired_is_sent_home_and_forgotten(tmp_path):
+    page = json.dumps((ROOT / "tests" / "fixtures" / "expired_session.html").read_text(encoding="utf-8"))
+    got = run(tmp_path, f"""
+        state.tabs = {tabs((1, AFTER_CAPTCHA), (2, S.format("BBB")))};
+        state.tabs[0].refs = {REFS};
+        state.tabs[0].active = true;
+        await runJob({{ path: "/search", cont: false }});    // tab 2 has ccd= in its URL, so it goes first and works
+        state.tabs[1].html = {page};                         // overnight, tab 2's session expires
+        await runJob({{ path: "/search", cont: false }});    // ... it answers with the Error page: sent home
+        const c = await runJob({{ path: "/search", cont: false }});
+        return [state.ran, state.updated, c.ok];""")
+    assert got == [[[2, "/search"], [2, "/search"], [1, "/search"]], [[2, "https://ndltd.ncl.edu.tw/"]], True]

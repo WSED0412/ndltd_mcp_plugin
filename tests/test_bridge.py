@@ -336,3 +336,10 @@ async def test_stopping_fails_waiting_jobs_at_once_and_none_runs_after_a_restart
     with pytest.raises(NdltdNetworkError, match="關閉"):
         await asyncio.wait_for(task, 3)
     assert b.jobs.empty() and not b.pending and b._busy == 0
+
+
+async def test_an_expired_session_is_reported_as_such(bridge):
+    c = BridgeClient(bridge, min_interval=0)
+    fake_extension(bridge, lambda job: {"ok": True, "status": 200, "html": load("expired_session.html")})
+    with pytest.raises(NdltdCaptchaRequired, match="過期"):
+        await c.search_html("x")

@@ -35,8 +35,10 @@ async function pageJob(job) {
   const RE = /^(?:https:\/\/ndltd\.ncl\.edu\.tw)?(\/cgi-bin\/gs32\/gsweb\.cgi\/ccd=[0-9A-Za-z._~-]+)(?:[\/?#]|$)/;
   let base = (location.pathname.match(RE) || [])[1];
   if (!base) {
+    const html = (document.documentElement && document.documentElement.innerHTML) || "";
+    if (html.includes("this is a Blank page")) return { ok: false, kind: "blank" };  // throttled: leave the tab alone
     const captcha = ((document.body && document.body.innerText) || "").includes("驗證碼檢查機制");
-    if (!captcha) {
+    if (!captcha && location.pathname.startsWith("/cgi-bin/gs32/gsweb.cgi")) {
       // After the captcha (and some redirects) the site serves a working page at a URL without ccd= (seen
       // 2026-11-28: the search page at gsweb.cgi?...&check=確定). Its own forms and links still carry the session
       // id, so use that when they all name the same one.
@@ -81,6 +83,14 @@ function isCaptchaPage(html) {
   return !(html.includes("gs32_levelrecord") || html.includes("tableoutfmt2"));
 }
 
+// Mirrors the 'expired' rule of page_kind() in src/ndltd_mcp/parsers.py: the session is gone on the server.
+function isExpiredPage(html) {
+  if (!/<h1[^>]*>\s*Error\s*<\/h1>/i.test(html)) return false;
+  const gap = "(?:\\s|&nbsp;|<[^>]*>)*";
+  if (new RegExp("檢索結果共" + gap + "[\\d,]+" + gap + "筆").test(html)) return false;
+  return !(html.includes("gs32_levelrecord") || html.includes("tableoutfmt2"));
+}
+
 function hasSession(tab) {
   try { return SESSION_PATH.test(new URL(tab.url).pathname); } catch (e) { return false; }
 }
@@ -95,10 +105,14 @@ function isEntryPage(tab) {
   try { const p = new URL(tab.url).pathname; return p === "/" || p.includes("/login"); } catch (e) { return false; }
 }
 
+function usable(t) {
+  return hasSession(t) || (isSitePage(t) && !isEntryPage(t));  // pageJob checks the session id itself
+}
+
 function pickTab(tabs) {
   const withSession = tabs.filter(hasSession);
   return (
-    withSession.find((t) => t.id === lastTabId) ||
+    tabs.filter(usable).find((t) => t.id === lastTabId) ||
     withSession.find((t) => t.active) ||
     withSession[0] ||
     tabs.find((t) => isSitePage(t) && !isEntryPage(t) && t.active) ||
@@ -118,7 +132,6 @@ async function runJob(job) {
   // A follow-up request (job.cont) goes to the tab its operation started in, or nowhere: another tab has another
   // session and another result set. When nothing is remembered (worker just restarted) the usual choice applies.
   const follow = job.cont && lastTabId !== null && lastSession !== null;
-  const usable = (t) => hasSession(t) || (isSitePage(t) && !isEntryPage(t));  // pageJob checks the session id itself
   let tab = follow ? tabs.filter(usable).find((t) => t.id === lastTabId) : pickTab(tabs);
   if (!tab) return { ok: false, kind: "tab_lost" };
   if (follow) job = { ...job, expect: lastSession };
@@ -134,13 +147,15 @@ async function runJob(job) {
     res = { ok: false, kind: "script_error", error: String(e) };
   }
   if (!res) res = { ok: false, kind: "nosession", error: "no result from page" };
-  if (res.ok) { lastTabId = tab.id; lastSession = res.session; }
-  delete res.session; // stays in the browser
   // A tab already on the entry/captcha flow is left alone (the human may be typing). A tab with no session that
   // is somewhere else, or one whose expired session answered with the captcha page, goes to the entry page once.
-  const expired = res.ok && isCaptchaPage(res.html);
+  const expired = res.ok && (isCaptchaPage(res.html) || isExpiredPage(res.html));
+  if (res.ok && !expired) { lastTabId = tab.id; lastSession = res.session; }
+  else if (expired && tab.id === lastTabId) { lastTabId = null; lastSession = null; }  // that session is gone
+  delete res.session; // stays in the browser
   if ((res.kind === "nosession" && !isEntryPage(tab)) || expired) {
     await chrome.tabs.update(tab.id, { url: HOME, active: true });
+    res.home = true;
   }
   return res;
 }

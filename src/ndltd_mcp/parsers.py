@@ -24,8 +24,14 @@ def _is_content_page(html: str) -> bool:
     return result_total(html) is not None or any(m in html for m in _CONTENT_MARKERS)
 
 
+_ERROR_H1_RE = re.compile(r"<h1[^>]*>\s*Error\s*</h1>", re.I)
+
+
 def page_kind(html: str) -> str:
-    """'blank' (site throttling), 'captcha' (human must solve it) or 'ok'.
+    """'blank' (site throttling), 'captcha' (human must solve it), 'expired' or 'ok'.
+    'expired': the session (ccd) is no longer valid on the server. The site answers any request under it with a small
+    "GlobalShare" page whose hidden <h1> says Error and whose only link ("Loading...") goes to a NEW session's login
+    (seen 2026-11-29, after a night). The same rule is mirrored in extension/background.js (isExpiredPage).
     The two marker phrases only count on a page that is not a content page: searching for the phrase itself, or a
     thesis whose abstract quotes it, must not be reported as a block or a captcha.
     The same rule is mirrored in extension/background.js (isCaptchaPage)."""
@@ -36,6 +42,8 @@ def page_kind(html: str) -> str:
         return "blank"
     if captcha:
         return "captcha"
+    if _ERROR_H1_RE.search(html) and not _is_content_page(html):
+        return "expired"
     return "ok"
 
 
@@ -270,13 +278,25 @@ _HISTORY_RE = re.compile(r"record\?r1=\d+&(?:amp;)?h1=(\d+)")
 
 
 def history_number(html: str) -> int | None:
-    """Which search of the session a result list belongs to: the h1= of its record links. The site numbers every
-    search of a session (1, 2, 3, ...) and /record?r1=N&h1=K reads row N of search K, so a record must be read with
-    the number of the search just made, never a fixed 1 (that is the session's FIRST search; measured 2026-11-28)."""
-    nums = _HISTORY_RE.findall(html)
-    if not nums:
+    """Which search of the session a result list belongs to. The site numbers every search of a session (1, 2, 3, ...)
+    and /record?r1=N&h1=K reads row N of search K, so a record must be read with the number of the search just made,
+    never a fixed 1 (that is the session's FIRST search; measured 2026-11-28). Read from the result rows' own record
+    links only (not any link on the page), and only when they all agree with each other and with the result form's
+    hidden h1 field if it has one; otherwise None, so the caller refuses instead of guessing."""
+    tree = HTMLParser(html)
+    nums = set()
+    for td in tree.css("td.tdfmt1-content"):
+        link = td.css_first("a.slink")
+        m = _HISTORY_RE.search(link.attributes.get("href") or "") if link is not None else None
+        if m:
+            nums.add(m.group(1))
+    for inp in tree.css('input[name="h1"]'):
+        v = (inp.attributes.get("value") or "").strip()
+        if v.isdigit() and nums:
+            nums.add(v)
+    if len(nums) != 1:
         return None
-    return int(max(set(nums), key=nums.count))
+    return int(nums.pop())
 
 
 def result_total(html: str) -> int | None:

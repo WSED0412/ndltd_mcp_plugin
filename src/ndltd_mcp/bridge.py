@@ -336,8 +336,13 @@ class BridgeClient(ExportMixin, SessionApi):
             kind = res.get("kind", "")
             if kind == "captcha":
                 raise NdltdCaptchaRequired("國圖分頁正顯示驗證碼頁。請你本人在該分頁輸入驗證碼，進入搜尋頁後再呼叫一次。")
+            if kind == "blank":
+                raise NdltdBlockedError(
+                    "國圖回了「Blank page」，這是站方的限流／封鎖。請停止，等幾小時後再試；不要重試或換 IP 繞過。"
+                )
             if kind == "nosession":
-                where = "已開一個國圖分頁" if res.get("opened") else "已把國圖分頁帶到首頁"
+                where = ("已開一個國圖分頁" if res.get("opened") else "已把國圖分頁帶到首頁" if res.get("home")
+                         else "國圖分頁停在首頁或登入頁")
                 raise NdltdCaptchaRequired(
                     f"瀏覽器還沒有可用的國圖 session（{where}）。請在該分頁進入搜尋頁（若出現驗證碼請本人輸入），"
                     "再呼叫一次。"
@@ -359,5 +364,10 @@ class BridgeClient(ExportMixin, SessionApi):
         if kind == "captcha":
             raise NdltdCaptchaRequired(
                 "國圖要求驗證碼。已把瀏覽器分頁帶到驗證碼頁，請你本人輸入，進入搜尋頁後再呼叫一次。"
+            )
+        if kind == "expired":
+            raise NdltdCaptchaRequired(
+                "國圖分頁的 session 已過期（站方回了 Error 頁）。已把分頁帶回國圖首頁；請在該分頁進入搜尋頁"
+                "（若出現驗證碼請本人輸入），再呼叫一次。"
             )
         return _Page(html)

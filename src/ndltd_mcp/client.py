@@ -258,6 +258,9 @@ class NdltdClient(ExportMixin, SessionApi):
         if kind == "captcha":
             self.ccd = None
             resp = await self._pass_captcha(resp)
+        if kind == "expired":  # come in again for a new session (the caller retries once)
+            self.ccd = None
+            return resp
         self._adopt(resp)
         return resp
 

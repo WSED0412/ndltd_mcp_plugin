@@ -158,7 +158,26 @@ def test_page_kind_ignores_the_marker_phrases_inside_content_pages():
     assert parsers.page_kind("<title>x</title><form>驗證碼檢查機制<input name=validinput></form>") == "captcha"
 
 
+def _rows(*hrefs, hidden=None):
+    rows = "".join(f'<td class="tdfmt1-content"><a class="slink" href="{h}">t</a></td>' for h in hrefs)
+    form = f'<form action="x/result"><input type="hidden" name="h1" value="{hidden}"></form>' if hidden else ""
+    return f"<table><tr>{rows}</tr></table>{form}"
+
+
 def test_history_number_is_the_search_a_result_list_belongs_to():
-    page = '<a href="/x/record?r1=1&amp;h1=3">a</a><a href="/x/record?r1=2&h1=3">b</a><a href="/x/record?r1=1&h1=1">old</a>'
-    assert parsers.history_number(page) == 3
+    assert parsers.history_number(_rows("/x/record?r1=1&amp;h1=3", "/x/record?r1=2&h1=3", hidden=3)) == 3
+    assert parsers.history_number(load("search_one_result.html")) == 1
+    # links elsewhere on the page do not count, even when they outnumber a one-row list
+    stray = '<a href="/x/record?r1=1&h1=1">x</a>' * 5
+    assert parsers.history_number(_rows("/x/record?r1=21&h1=4") + stray) == 4
+    # disagreement is refused, never guessed
+    assert parsers.history_number(_rows("/x/record?r1=1&h1=3", "/x/record?r1=2&h1=2")) is None
+    assert parsers.history_number(_rows("/x/record?r1=1&h1=3", hidden=2)) is None
     assert parsers.history_number("<p>no record links</p>") is None
+
+
+def test_an_expired_session_page_is_recognised():
+    # seen 2026-11-29: a request under a session that expired overnight gets this page, not a result list
+    assert parsers.page_kind(load("expired_session.html")) == "expired"
+    assert parsers.page_kind(load("search_one_result.html")) == "ok"
+    assert parsers.page_kind("檢索結果共 3 筆 <h1>Error</h1>") == "ok"  # a result list quoting it is still a result list

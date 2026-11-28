@@ -243,9 +243,12 @@ class OneResultSetSite(SessionApi):
             if path.startswith("/record"):  # row r1 of search number h1, whichever search that was
                 shown = self.history[int(parse_qs(path.split("?", 1)[1])["h1"][0]) - 1]
                 return httpx.Response(200, text=f"<p>result set: {shown}</p>")
-            form = '<form action="x/result"><input name="jpsize" value="20"></form>'
-            link = f'<a href="/x/record?r1=1&amp;h1={len(self.history)}">t</a>'
-            return httpx.Response(200, text=f"檢索結果共 50 筆{form}{link}<p>result set: {self.current}</p>")
+            h1 = len(self.history)
+            form = f'<form action="x/result"><input name="jpsize" value="20"><input type="hidden" name="h1" value="{h1}"></form>'
+            rows = "".join(f'<td class="tdfmt1-content"><a class="slink" href="/x/record?r1={r}&amp;h1={h1}">t</a></td>'
+                           for r in range(1, 3))
+            return httpx.Response(200, text=f"檢索結果共 50 筆{form}<table><tr>{rows}</tr></table>"
+                                            f"<p>result set: {self.current}</p>")
 
 
 async def test_a_record_is_read_from_the_search_just_made_not_the_sessions_first():
