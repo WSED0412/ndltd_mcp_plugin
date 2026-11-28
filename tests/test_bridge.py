@@ -228,3 +228,90 @@ async def test_lost_tab_is_reported(bridge):
     with pytest.raises(NdltdNetworkError, match="已中止"):
         await c.search_html("x")
     t.join(5)
+
+
+# ---------------------------------------------------------------- port held only while in use
+
+def _ok(job):
+    return {"ok": True, "status": 200, "html": "<html></html>"}
+
+
+async def test_the_port_is_bound_by_the_first_job_and_released_when_idle():
+    b = Bridge(port=0, token=TOKEN, idle_release=0.3)
+    b.start()  # only to learn a free port; release it again
+    port = b.port
+    b.stop()
+    assert not b.listening
+    import asyncio
+
+    def extension():  # like the real one: retry while nothing listens, re-poll on 204
+        while True:
+            try:
+                st, data = http_call(b, "GET", "/poll")
+            except OSError:
+                threading.Event().wait(0.05)
+                continue
+            if st == 200:
+                job = json.loads(data)
+                http_call(b, "POST", "/result", json.dumps({"id": job["id"], **_ok(job)}))
+                return
+
+    threading.Thread(target=extension, daemon=True).start()
+    res = await b.submit({"method": "GET", "path": "/x"}, timeout=5)
+    assert res["ok"]
+    assert b.listening and b.port == port
+    await asyncio.sleep(0.8)
+    assert not b.listening  # released after the idle window
+    b.stop()
+
+
+async def test_a_job_waits_for_another_window_to_release_the_port():
+    import asyncio
+    holder = Bridge(port=0, token=TOKEN, idle_release=None)
+    holder.start()
+    other = Bridge(port=holder.port, token=TOKEN, idle_release=None, acquire_wait=10)
+    threading.Timer(0.7, holder.stop).start()
+    task = asyncio.ensure_future(other.submit({"method": "GET", "path": "/x"}, timeout=5))
+    await asyncio.sleep(0.3)
+    assert not other.listening  # still waiting, not failed
+    for _ in range(100):
+        if other.listening:
+            break
+        await asyncio.sleep(0.05)
+    assert other.listening
+    fake_extension(other, _ok)
+    assert (await task)["ok"]
+    other.stop()
+
+
+async def test_a_job_gives_up_with_a_clear_error_when_the_port_stays_taken():
+    holder = Bridge(port=0, token=TOKEN, idle_release=None)
+    holder.start()
+    other = Bridge(port=holder.port, token=TOKEN, acquire_wait=0.6)
+    try:
+        with pytest.raises(NdltdNetworkError, match="Claude"):
+            await other.submit({"method": "GET", "path": "/x"}, timeout=5)
+        assert other._busy == 0
+    finally:
+        holder.stop()
+
+
+def test_release_wakes_a_blocked_poll_and_another_process_can_bind_at_once():
+    a = Bridge(port=0, token=TOKEN, idle_release=None)
+    a.start()
+    got = {}
+
+    def poll():
+        got["status"] = http_call(a, "GET", "/poll")[0]
+
+    t = threading.Thread(target=poll, daemon=True)
+    t.start()
+    import time
+    time.sleep(0.3)  # the poll is now blocked in a handler thread
+    a.stop()
+    t.join(3)
+    assert got.get("status") == 204  # returned at once instead of after POLL_SECONDS
+    b = Bridge(port=a.port, token=TOKEN, idle_release=None)
+    b.start()  # the same port is free for the next window, even right after a live connection on it
+    assert http_call(b, "GET", "/poll", headers={"X-Ndltd-Token": "wrong"})[0] == 403
+    b.stop()

@@ -34,6 +34,14 @@ MAX_BODY = 4 * 1024 * 1024
 UNAUTH_DRAIN = 64 * 1024  # read at most this much of an unauthorised body
 EXTENSION_ORIGINS = ("chrome-extension://", "moz-extension://")  # Chrome / Firefox; a web page cannot have either
 EXT_ALIVE_WITHIN = 70.0  # the extension polls every <= 25 s; longer silence means it is not connected
+# The port is held only while this process is using it: bound by the first job, released IDLE_RELEASE seconds after
+# the last one, so several Claude windows (each with its own ndltd-mcp) can take turns. A job that finds the port
+# taken waits up to ACQUIRE_WAIT for the holder to let go; that must cover the holder's idle window plus one job of
+# its own, or a call made just after another window's call would fail. Tune the two together.
+IDLE_RELEASE = 15.0
+ACQUIRE_WAIT = IDLE_RELEASE + JOB_TIMEOUT
+ACQUIRE_RETRY = 0.5
+_WAKE = "wake"  # queued on release: a poll blocked in this process returns at once, so the extension moves on
 
 
 def token_path() -> Path:
@@ -121,6 +129,8 @@ class _Handler(BaseHTTPRequestHandler):
             try:
                 job = b.jobs.get(timeout=max(0.0, deadline - time.monotonic()))
             except queue.Empty:
+                job = None
+            if job is None or job.get(_WAKE):
                 b.last_poll = time.monotonic()
                 try:
                     return self._reply(204)
@@ -164,41 +174,105 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 class Bridge:
-    def __init__(self, port: int | None = None, token: str | None = None):
+    def __init__(self, port: int | None = None, token: str | None = None, idle_release: float | None = IDLE_RELEASE,
+                 acquire_wait: float = ACQUIRE_WAIT):
         self.port = port if port is not None else bridge_port()
         self.token = token or load_or_create_token()
         self.jobs: queue.Queue[dict] = queue.Queue()
         self.pending: dict[str, concurrent.futures.Future] = {}
         self.last_poll = 0.0
+        self.idle_release = idle_release  # None: keep the port until stop()
+        self.acquire_wait = acquire_wait
         self._httpd: ThreadingHTTPServer | None = None
+        self._lock = threading.RLock()  # start / stop / the idle check
+        self._busy = 0  # jobs of this process in flight
+        self._last_active = 0.0
 
     def start(self) -> None:
-        if self._httpd:
-            return
-        try:
-            self._httpd = _Server(("127.0.0.1", self.port), _Handler)
-        except OSError as e:
-            raise NdltdNetworkError(
-                f"橋接口 127.0.0.1:{self.port} 無法使用（{e}）。可能已有另一個 ndltd-mcp 在執行；"
-                "也可用環境變數 NDLTD_BRIDGE_PORT 換埠（擴充功能設定要同步）。"
-            ) from e
-        self.port = self._httpd.server_address[1]
-        self._httpd.owner = self  # type: ignore[attr-defined]
-        self._httpd.daemon_threads = True
-        threading.Thread(target=self._httpd.serve_forever, daemon=True).start()
+        """Bind now, or raise at once if the port is taken (submit() is the one that waits)."""
+        with self._lock:
+            if self._httpd:
+                return
+            self._drop_wakes()  # a wake nobody was polling for would only bounce the next poll
+            try:
+                self._httpd = _Server(("127.0.0.1", self.port), _Handler)
+            except OSError as e:
+                raise NdltdNetworkError(
+                    f"橋接口 127.0.0.1:{self.port} 無法使用（{e}）。可能另一個 Claude 視窗的 ndltd-mcp 正在使用；"
+                    "也可用環境變數 NDLTD_BRIDGE_PORT 換埠（擴充功能設定要同步）。"
+                ) from e
+            self.port = self._httpd.server_address[1]  # port 0: keep the one we got, so a rebind reuses it
+            self._httpd.owner = self  # type: ignore[attr-defined]
+            self._httpd.daemon_threads = True
+            threading.Thread(target=self._httpd.serve_forever, daemon=True).start()
 
     def stop(self) -> None:
-        if self._httpd:
-            self._httpd.shutdown()
-            self._httpd.server_close()
-            self._httpd = None
+        with self._lock:
+            if self._httpd:
+                self.jobs.put({_WAKE: True})  # release a poll blocked in a handler thread (its socket closes)
+                self._httpd.shutdown()
+                self._httpd.server_close()
+                self._httpd = None
+
+    def _drop_wakes(self) -> None:
+        keep = []
+        while True:
+            try:
+                j = self.jobs.get_nowait()
+            except queue.Empty:
+                break
+            if not j.get(_WAKE):
+                keep.append(j)
+        for j in keep:
+            self.jobs.put(j)
+
+    @property
+    def listening(self) -> bool:
+        return self._httpd is not None
+
+    def _release_if_idle(self) -> None:
+        with self._lock:
+            if self._busy or self.idle_release is None:
+                return
+            if time.monotonic() - self._last_active >= self.idle_release - 0.05:
+                self.stop()
+
+    async def _acquire(self) -> None:
+        deadline = time.monotonic() + self.acquire_wait
+        while True:
+            with self._lock:
+                try:
+                    self.start()
+                    self._busy += 1
+                    return
+                except NdltdNetworkError as e:
+                    if time.monotonic() >= deadline:
+                        raise NdltdNetworkError(
+                            f"{e}（已等候 {self.acquire_wait:.0f} 秒仍未釋出，請稍後再試，或關掉沒在用的 Claude 視窗。）"
+                        ) from None
+            await asyncio.sleep(ACQUIRE_RETRY)
+
+    def _done(self) -> None:
+        with self._lock:
+            self._busy -= 1
+            self._last_active = time.monotonic()
+            if self._busy == 0 and self.idle_release is not None:
+                t = threading.Timer(self.idle_release, self._release_if_idle)
+                t.daemon = True
+                t.start()
 
     @property
     def extension_alive(self) -> bool:
         return self.last_poll > 0 and time.monotonic() - self.last_poll < EXT_ALIVE_WITHIN
 
     async def submit(self, job: dict, timeout: float = JOB_TIMEOUT) -> dict:
-        self.start()
+        await self._acquire()
+        try:
+            return await self._run(job, timeout)
+        finally:
+            self._done()
+
+    async def _run(self, job: dict, timeout: float) -> dict:
         job = {**job, "id": secrets.token_hex(8)}
         fut: concurrent.futures.Future = concurrent.futures.Future()
         self.pending[job["id"]] = fut

@@ -146,7 +146,7 @@ Do not refresh repeatedly and do not change IP. First check by hand in a browser
 
 ### When a tool reports "bridge port unavailable" or "extension not connected"
 
-- **Bridge port unavailable**: another process is holding port 8765, most likely a previous ndltd-mcp that did not exit. The program deliberately does not share the port (on Windows sharing lets jobs go to the wrong process). End the old `ndltd-mcp` (Task Manager or `Get-Process`) and reconnect with `/mcp`.
+- **Bridge port unavailable**: each Claude window runs its own ndltd-mcp, and only one can hold port 8765 at a time (sharing is deliberately refused: on Windows it lets jobs go to the wrong process). The port is taken only when a tool is called and released 15 s after the last call; a call that finds it taken waits for it (up to about 2 minutes). If it still fails, something else holds the port, for example an ndltd-mcp older than this version that grabbed it at start-up: end that process (Task Manager or `Get-Process`) or close the Claude window it belongs to.
 - **Extension not connected**: check that Chrome is open, the extension is loaded, the token on the options page equals `%USERPROFILE%\.ndltd_mcp\token`, and the port matches; reload the extension after changing it.
 
 ## Status
